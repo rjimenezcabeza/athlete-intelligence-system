@@ -1,0 +1,9 @@
+{
+  "nav": { "dashboard": "Dashboard", "training": "Train", "history": "History", "templates": "Templates", "exercises": "Exercises", "import": "Import", "coach": "AI Coach", "settings": "Settings" },
+  "auth": { "login": "Sign in", "register": "Create account", "logout": "Sign out", "email": "Email", "password": "Password", "noAccount": "Don't have an account?", "haveAccount": "Already have an account?" },
+  "training": { "startSession": "Start session", "endSession": "End session", "saveSet": "Save set", "set": "Set", "sets": "Sets", "weight": "Weight", "reps": "Reps", "rir": "RIR", "rest": "Rest", "volume": "Volume", "offline": "Offline — saving locally", "syncing": "Syncing...", "synced": "Synced", "personalRecord": "New personal record!", "noTemplates": "No templates. Create one to start.", "freeSession": "Free session" },
+  "exercises": { "search": "Search exercises", "filter": "Filter", "allGroups": "All muscle groups", "chest": "Chest", "back": "Back", "shoulders": "Shoulders", "biceps": "Biceps", "triceps": "Triceps", "legs": "Legs", "glutes": "Glutes", "core": "Core", "calves": "Calves", "createExercise": "Create exercise" },
+  "coach": { "analyzing": "Analyzing history...", "recommendation": "Recommendation", "accept": "Apply", "modify": "Modify", "ignore": "Ignore", "disclaimer": "AI suggestion. You decide." },
+  "progression": { "increaseWeight": "Increase weight", "increaseReps": "Increase reps", "maintain": "Maintain weight", "deload": "Deload recommended", "insufficientData": "Insufficient data" },
+  "common": { "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "create": "Create", "loading": "Loading...", "error": "Error", "success": "Success", "back": "Back", "next": "Next", "done": "Done" }
+}
