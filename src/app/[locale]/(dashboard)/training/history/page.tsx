@@ -1,27 +1,28 @@
 import { createServerSideClient } from '@/lib/supabase/server'
+import { HistoryClient } from '@/components/training/HistoryClient'
+
 export default async function HistoryPage() {
   const supabase = await createServerSideClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: profile } = await supabase.from('athlete_profiles').select('id').eq('user_id', user!.id).single()
-  const { data: sessions } = await supabase.from('training_sessions').select('*').eq('athlete_id', profile?.id ?? '').order('session_date', { ascending: false }).limit(20)
-  return (
-    <div className="p-4">
-      <h1 className="text-xl font-semibold mb-4">Historial</h1>
-      {!sessions?.length ? (
-        <p className="text-sm text-muted-foreground text-center py-12">Aún no hay sesiones registradas.<br/>¡Completa tu primera sesión!</p>
-      ) : (
-        <div className="space-y-3">
-          {sessions.map(s => (
-            <div key={s.id} className="rounded-xl border border-border/50 bg-card p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{s.day_label ?? 'Sesión'}</p>
-                <p className="text-xs text-muted-foreground">{new Date(s.session_date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-              </div>
-              {s.duration_minutes && <p className="text-xs text-muted-foreground mt-1">⏱ {s.duration_minutes} min</p>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+  const { data: profile } = await supabase
+    .from('athlete_profiles')
+    .select('id, weight_unit')
+    .eq('user_id', user!.id)
+    .single()
+
+  const { data: sessions } = await supabase
+    .from('training_sessions')
+    .select(`
+      id, session_date, day_label, duration_minutes,
+      session_exercises(
+        exercise:exercises(name, muscle_group_primary),
+        sets(weight_kg, reps_completed, set_type, is_personal_record)
+      )
+    `)
+    .eq('athlete_id', profile?.id ?? '')
+    .order('session_date', { ascending: false })
+    .order('started_at', { ascending: false })
+    .limit(30)
+
+  return <HistoryClient sessions={sessions ?? []} weightUnit={profile?.weight_unit ?? 'kg'} />
 }
