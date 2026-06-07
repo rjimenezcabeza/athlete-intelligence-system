@@ -8,7 +8,7 @@ const intlMiddleware = createMiddleware({
   localePrefix: 'always',
 })
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const isAuthPath = ['/login', '/register', '/auth'].some(p => pathname.includes(p))
   const response = intlMiddleware(request) ?? NextResponse.next()

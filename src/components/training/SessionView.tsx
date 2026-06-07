@@ -165,17 +165,25 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
       <div className="flex-1 p-4">
         {currentEx && (
           <SetLogger
-            sessionExerciseId={currentEx.sessionExerciseId}
+            key={`${currentEx.exerciseId}-${currentEx.loggedSets.length + 1}`}
+            exerciseId={currentEx.exerciseId}
             exerciseName={currentEx.exerciseName}
-            dayLabel={currentEx.dayLabel}
-            loggedSets={currentEx.loggedSets}
-            targetSets={currentEx.setsTarget}
-            repRangeMin={currentEx.repRangeMin}
-            repRangeMax={currentEx.repRangeMax}
-            rirTarget={currentEx.rirTarget}
-            aiSuggestion={currentEx.aiSuggestion}
-            onSetLogged={handleSetLogged}
-            onSessionExerciseDone={() => nextExercise()}
+            setNumber={currentEx.loggedSets.length + 1}
+            previousWeight={currentEx.lastSessionSets?.[currentEx.loggedSets.length]?.weightKg}
+            previousReps={currentEx.lastSessionSets?.[currentEx.loggedSets.length]?.repsCompleted}
+            onSetLogged={async (data) => {
+              await handleSetLogged({
+                setNumber: data.setNumber,
+                setType: data.isWarmup ? 'warmup' : 'working',
+                weightKg: data.weightKg,
+                repsCompleted: data.reps,
+                rirActual: data.rir,
+              })
+              if (currentEx.loggedSets.length + 1 >= currentEx.setsTarget) {
+                nextExercise()
+              }
+            }}
+            onSkip={currentExerciseIndex < totalExercises - 1 ? () => nextExercise() : undefined}
           />
         )}
       </div>

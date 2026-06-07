@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [{ protocol: 'https', hostname: '*.supabase.co' }],
   },
+  turbopack: {
+    root: __dirname,
+  },
 }
 
 export default withNextIntl(nextConfig)
