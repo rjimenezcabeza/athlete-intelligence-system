@@ -1,45 +1,49 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { SetLogger, type SetData } from './SetLogger'
+import { SetLogger } from './SetLogger'
 import { QuickExerciseSelector } from './QuickExerciseSelector'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
-// sessionExerciseId: FK en tabla session_exercises (requerido para insertar en sets)
-interface Exercise {
+interface ExerciseInSession {
   sessionExerciseId: string
-  id: string
+  exerciseId: string
   name: string
-  sets_target: number
-  reps_min: number
-  reps_max: number
-  rir_target?: number
+  setsTarget: number
+  repRangeMin: number
+  repRangeMax: number
+  rirTarget?: number
+  restSeconds: number
+  orderInSession: number
 }
 
-interface LoggedSet extends SetData {}
-
-interface ActiveSessionProps {
-  sessionId: string
+interface LoggedSet {
+  exerciseId: string
+  setNumber: number
+  weightKg: number
+  reps: number
+  rir?: number
+  isWarmup: boolean
+  timestamp: Date
 }
 
-export function ActiveSession({ sessionId }: ActiveSessionProps) {
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0)
+export function ActiveSession({ sessionId }: { sessionId: string }) {
+  const [exercises, setExercises] = useState<ExerciseInSession[]>([])
+  const [currentIndex, setCurrentIndex] = useState(0)
   const [currentSetNumber, setCurrentSetNumber] = useState(1)
   const [loggedSets, setLoggedSets] = useState<LoggedSet[]>([])
-  const [sessionStartTime] = useState(new Date())
+  const [sessionStart] = useState(new Date())
   const [isFinished, setIsFinished] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [showExerciseSelector, setShowExerciseSelector] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
 
-  useEffect(() => {
-    loadSession()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId])
+  useEffect(() => { loadSession() }, [sessionId])
 
   const loadSession = async () => {
-    // session_exercises no tiene sets_target/reps — vienen de template_exercises vía FK
     const { data: session } = await (supabase as any)
       .from('training_sessions')
       .select(`
@@ -47,74 +51,76 @@ export function ActiveSession({ sessionId }: ActiveSessionProps) {
         session_exercises (
           id,
           order_in_session,
-          exercises (id, name),
-          template_exercises (
-            sets_target,
-            rep_range_min,
-            rep_range_max,
-            rir_target
-          )
+          exercise_id,
+          template_exercise_id,
+          exercises ( id, name ),
+          template_exercises ( sets_target, rep_range_min, rep_range_max, rir_target, rest_seconds )
         )
       `)
       .eq('id', sessionId)
       .single()
 
     if (session?.session_exercises?.length > 0) {
-      const exs = session.session_exercises
-        .sort((a: any, b: any) => (a.order_in_session ?? 0) - (b.order_in_session ?? 0))
+      const exs: ExerciseInSession[] = session.session_exercises
+        .sort((a: any, b: any) => a.order_in_session - b.order_in_session)
         .map((se: any) => ({
           sessionExerciseId: se.id,
-          id: se.exercises.id,
+          exerciseId: se.exercises.id,
           name: se.exercises.name,
-          sets_target: se.template_exercises?.sets_target ?? 3,
-          reps_min: se.template_exercises?.rep_range_min ?? 8,
-          reps_max: se.template_exercises?.rep_range_max ?? 12,
-          rir_target: se.template_exercises?.rir_target,
+          setsTarget: se.template_exercises?.sets_target ?? 3,
+          repRangeMin: se.template_exercises?.rep_range_min ?? 8,
+          repRangeMax: se.template_exercises?.rep_range_max ?? 12,
+          rirTarget: se.template_exercises?.rir_target,
+          restSeconds: se.template_exercises?.rest_seconds ?? 120,
+          orderInSession: se.order_in_session,
         }))
       setExercises(exs)
     } else {
-      // Sesión libre sin template — mostrar selector
       setShowExerciseSelector(true)
     }
   }
 
   const handleAddExercise = async (exercise: { id: string; name: string }) => {
-    // Crear session_exercise en BD
+    const nextOrder = exercises.length + 1
+
     const { data: se, error } = await (supabase as any)
       .from('session_exercises')
       .insert({
         session_id: sessionId,
         exercise_id: exercise.id,
-        order_in_session: exercises.length + 1,
+        order_in_session: nextOrder,
       })
       .select()
       .single()
 
     if (error || !se) return
 
-    setExercises(prev => [...prev, {
+    const newEx: ExerciseInSession = {
       sessionExerciseId: se.id,
-      id: exercise.id,
+      exerciseId: exercise.id,
       name: exercise.name,
-      sets_target: 3,
-      reps_min: 8,
-      reps_max: 12,
-    }])
+      setsTarget: 3,
+      repRangeMin: 8,
+      repRangeMax: 12,
+      rirTarget: 2,
+      restSeconds: 120,
+      orderInSession: nextOrder,
+    }
+
+    setExercises(prev => [...prev, newEx])
     setShowExerciseSelector(false)
+    setCurrentIndex(exercises.length)
+    setCurrentSetNumber(1)
   }
 
-  const currentExercise = exercises[currentExerciseIndex]
-
-  const setsForCurrentExercise = loggedSets.filter(
-    (s) => s.exerciseId === currentExercise?.id
-  )
-
   const handleSetLogged = async (data: LoggedSet) => {
+    const currentEx = exercises[currentIndex]
+    if (!currentEx) return
+
     setLoggedSets(prev => [...prev, data])
 
-    // sets usa set_type enum, NO is_warmup; session_exercise_id (no session_id)
     await (supabase as any).from('sets').insert({
-      session_exercise_id: currentExercise.sessionExerciseId,
+      session_exercise_id: currentEx.sessionExerciseId,
       set_number: data.setNumber,
       set_type: data.isWarmup ? 'warmup' : 'working',
       weight_kg: data.weightKg,
@@ -122,45 +128,77 @@ export function ActiveSession({ sessionId }: ActiveSessionProps) {
       rir_actual: data.rir ?? null,
     })
 
-    if (currentSetNumber >= currentExercise.sets_target) {
-      if (currentExerciseIndex < exercises.length - 1) {
-        setCurrentExerciseIndex(i => i + 1)
+    const workingSetsForCurrent = loggedSets.filter(
+      s => s.exerciseId === currentEx.exerciseId && !s.isWarmup
+    ).length + (data.isWarmup ? 0 : 1)
+
+    if (!data.isWarmup && workingSetsForCurrent >= currentEx.setsTarget) {
+      if (currentIndex < exercises.length - 1) {
+        setCurrentIndex(i => i + 1)
         setCurrentSetNumber(1)
       } else {
         setIsFinished(true)
       }
-    } else {
+    } else if (!data.isWarmup) {
       setCurrentSetNumber(n => n + 1)
     }
   }
 
-  const handleFinishSession = async () => {
+  const handleFinish = async () => {
     setIsSaving(true)
     await (supabase as any)
       .from('training_sessions')
       .update({ ended_at: new Date().toISOString() })
       .eq('id', sessionId)
     setIsSaving(false)
-    const locale = window.location.pathname.split('/')[1] || 'es'
-    window.location.href = `/${locale}/dashboard`
+    router.push('/dashboard')
   }
 
-  const elapsedMinutes = Math.floor(
-    (Date.now() - sessionStartTime.getTime()) / 60000
-  )
+  const elapsed = Math.floor((Date.now() - sessionStart.getTime()) / 60000)
+  const currentEx = exercises[currentIndex]
+  const workingSetsDone = loggedSets.filter(
+    s => currentEx && s.exerciseId === currentEx.exerciseId && !s.isWarmup
+  ).length
+
+  if (showExerciseSelector && exercises.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0F] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
+          <h1 className="text-white font-bold text-lg">Sesión libre</h1>
+          <span className="text-white/40 font-mono text-sm">{elapsed}min</span>
+        </div>
+        <div className="flex-1 flex flex-col justify-center px-4">
+          <p className="text-white/50 text-center text-sm font-mono mb-6">
+            Añade el primer ejercicio para empezar
+          </p>
+          <QuickExerciseSelector onSelect={handleAddExercise} />
+        </div>
+      </div>
+    )
+  }
 
   if (isFinished) {
+    const totalWorkingSets = loggedSets.filter(s => !s.isWarmup).length
     return (
       <div className="min-h-screen bg-[#0A0A0F] flex flex-col items-center justify-center p-6 gap-6">
         <div className="text-6xl">🎯</div>
-        <h2 className="text-2xl font-bold text-white text-center">
-          ¡Sesión completada!
-        </h2>
-        <p className="text-white/40 font-mono text-sm text-center">
-          {loggedSets.filter((s) => !s.isWarmup).length} series · {elapsedMinutes} minutos
-        </p>
+        <h2 className="text-2xl font-bold text-white text-center">¡Sesión completada!</h2>
+        <div className="flex gap-6 text-center">
+          <div>
+            <p className="text-3xl font-bold text-[#C8FF00] font-mono">{totalWorkingSets}</p>
+            <p className="text-xs text-white/40 font-mono uppercase">Series</p>
+          </div>
+          <div>
+            <p className="text-3xl font-bold text-[#C8FF00] font-mono">{elapsed}</p>
+            <p className="text-xs text-white/40 font-mono uppercase">Minutos</p>
+          </div>
+          <div>
+            <p className="text-3xl font-bold text-[#C8FF00] font-mono">{exercises.length}</p>
+            <p className="text-xs text-white/40 font-mono uppercase">Ejercicios</p>
+          </div>
+        </div>
         <button
-          onClick={handleFinishSession}
+          onClick={handleFinish}
           disabled={isSaving}
           className="w-full max-w-sm py-4 rounded-2xl bg-[#C8FF00] text-black font-bold text-lg disabled:opacity-50"
         >
@@ -170,26 +208,7 @@ export function ActiveSession({ sessionId }: ActiveSessionProps) {
     )
   }
 
-  if (showExerciseSelector) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0F] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <p className="text-white font-semibold">Añadir ejercicio</p>
-          {exercises.length > 0 && (
-            <button
-              onClick={() => setShowExerciseSelector(false)}
-              className="text-xs text-[#C8FF00] font-mono"
-            >
-              LISTO
-            </button>
-          )}
-        </div>
-        <QuickExerciseSelector onSelect={handleAddExercise} />
-      </div>
-    )
-  }
-
-  if (!currentExercise) {
+  if (!currentEx) {
     return (
       <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-[#C8FF00] border-t-transparent rounded-full animate-spin" />
@@ -197,87 +216,96 @@ export function ActiveSession({ sessionId }: ActiveSessionProps) {
     )
   }
 
+  const previousSets = loggedSets.filter(s => s.exerciseId === currentEx.exerciseId)
+  const lastSet = previousSets[previousSets.length - 1]
+
   return (
     <div className="min-h-screen bg-[#0A0A0F] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-[#C8FF00] animate-pulse" />
-          <span className="text-white/60 font-mono text-sm">{elapsedMinutes}min</span>
+          <span className="text-white/60 font-mono text-sm">{elapsed}min</span>
         </div>
-        <p className="text-xs text-white/30 font-mono uppercase tracking-widest">
-          Ejercicio {currentExerciseIndex + 1}/{exercises.length}
-        </p>
+        <span className="text-xs text-white/30 font-mono">
+          {currentIndex + 1}/{exercises.length}
+        </span>
         <button
           onClick={() => setIsFinished(true)}
-          className="text-xs text-white/30 hover:text-white/60 font-mono"
+          className="text-xs text-white/30 hover:text-white/60 font-mono transition-colors"
         >
           TERMINAR
         </button>
       </div>
 
-      {/* Exercise progress pills */}
-      <div className="flex gap-1.5 px-4 py-3 overflow-x-auto">
+      {/* Exercise pills */}
+      <div className="flex gap-1.5 px-4 py-3 overflow-x-auto scrollbar-none">
         {exercises.map((ex, i) => {
-          const doneSets = loggedSets.filter((s) => s.exerciseId === ex.id && !s.isWarmup).length
-          const isActive = i === currentExerciseIndex
-          const isDone = doneSets >= ex.sets_target
+          const done = loggedSets.filter(
+            s => s.exerciseId === ex.exerciseId && !s.isWarmup
+          ).length >= ex.setsTarget
           return (
-            <div
-              key={ex.sessionExerciseId}
-              className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-mono transition-all ${
-                isDone
-                  ? 'bg-[#C8FF00]/20 text-[#C8FF00] border border-[#C8FF00]/30'
-                  : isActive
-                  ? 'bg-white/20 text-white border border-white/30'
-                  : 'bg-white/5 text-white/30 border border-white/10'
-              }`}
-            >
-              {isDone ? '✓ ' : ''}{ex.name.split(' ')[0]}
+            <div key={ex.sessionExerciseId} className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-mono transition-all ${
+              done
+                ? 'bg-[#C8FF00]/20 text-[#C8FF00] border border-[#C8FF00]/30'
+                : i === currentIndex
+                ? 'bg-white/20 text-white border border-white/30'
+                : 'bg-white/5 text-white/30 border border-white/10'
+            }`}>
+              {done ? '✓ ' : ''}{ex.name.split(' ')[0]}
             </div>
           )
         })}
         <button
           onClick={() => setShowExerciseSelector(true)}
-          className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-mono bg-white/5 text-white/20 border border-dashed border-white/10 hover:border-white/30 transition-all"
+          className="flex-shrink-0 px-3 py-1 rounded-full text-xs font-mono bg-white/5 text-white/30 border border-dashed border-white/20 hover:border-[#C8FF00]/40 hover:text-[#C8FF00]/60 transition-all"
         >
-          + añadir
+          + ejercicio
         </button>
       </div>
 
       {/* Set progress bars */}
       <div className="flex gap-2 px-4 pb-3">
-        {Array.from({ length: currentExercise.sets_target }).map((_, i) => {
-          const done = i < setsForCurrentExercise.filter((s) => !s.isWarmup).length
-          const active = i === currentSetNumber - 1
-          return (
-            <div
-              key={i}
-              className={`h-1.5 flex-1 rounded-full transition-all ${
-                done ? 'bg-[#C8FF00]' : active ? 'bg-white/40' : 'bg-white/10'
-              }`}
-            />
-          )
-        })}
+        {Array.from({ length: currentEx.setsTarget }).map((_, i) => (
+          <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${
+            i < workingSetsDone ? 'bg-[#C8FF00]'
+            : i === workingSetsDone ? 'bg-white/40'
+            : 'bg-white/10'
+          }`} />
+        ))}
       </div>
 
-      {/* Main logger */}
+      {/* Main content */}
       <div className="flex-1 px-4 pb-8">
-        <SetLogger
-          key={`${currentExercise.sessionExerciseId}-${currentSetNumber}`}
-          exerciseId={currentExercise.id}
-          exerciseName={currentExercise.name}
-          setNumber={currentSetNumber}
-          onSetLogged={handleSetLogged}
-          onSkip={
-            currentExerciseIndex < exercises.length - 1
-              ? () => {
-                  setCurrentExerciseIndex(i => i + 1)
-                  setCurrentSetNumber(1)
-                }
-              : undefined
-          }
-        />
+        {showExerciseSelector ? (
+          <div className="rounded-2xl bg-[#111118] border border-white/10 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <p className="text-white font-semibold">Añadir ejercicio</p>
+              <button
+                onClick={() => setShowExerciseSelector(false)}
+                className="text-white/40 hover:text-white font-mono text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            <QuickExerciseSelector onSelect={handleAddExercise} />
+          </div>
+        ) : (
+          <SetLogger
+            key={`${currentEx.sessionExerciseId}-${currentSetNumber}`}
+            exerciseId={currentEx.exerciseId}
+            exerciseName={currentEx.name}
+            setNumber={currentSetNumber}
+            previousWeight={lastSet?.weightKg}
+            previousReps={lastSet?.reps}
+            onSetLogged={handleSetLogged}
+            onSkip={
+              currentIndex < exercises.length - 1
+                ? () => { setCurrentIndex(i => i + 1); setCurrentSetNumber(1) }
+                : undefined
+            }
+          />
+        )}
       </div>
     </div>
   )
