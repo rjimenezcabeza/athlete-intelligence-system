@@ -3,6 +3,7 @@ import { useLocale } from 'next-intl'
 import Link from 'next/link'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { ChevronRight, Flame, Trophy, Dumbbell, TrendingUp } from 'lucide-react'
+import { StartSessionButton } from '@/components/training/StartSessionButton'
 
 interface Props {
   displayName: string
@@ -52,6 +53,10 @@ export function DashboardClient({ displayName, nextTemplate }: Props) {
         <p className="text-sm text-muted-foreground mt-0.5">
           {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
+      </div>
+
+      <div className="px-0 py-2">
+        <StartSessionButton label="⚡ Iniciar Entrenamiento" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
