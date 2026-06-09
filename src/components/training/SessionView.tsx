@@ -7,7 +7,6 @@ import { useSessionStore } from '@/stores/session.store'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { Button } from '@/components/ui/button'
 import { Play, ChevronRight, CheckCircle } from 'lucide-react'
-import type { SetInput } from '@/types/training.types'
 
 interface Template { id: string; name: string; training_days_per_week: number | null }
 
@@ -19,16 +18,30 @@ interface SessionViewProps {
   availableTemplates: Template[]
 }
 
+const DEFAULT_SETS_TARGET = 3
+
 export function SessionView({ athleteId, initialTemplate, availableTemplates }: SessionViewProps) {
   const router = useRouter()
   const locale = useLocale()
   const { isOnline } = useOfflineSync()
-  const { sessionId, exercises, currentExerciseIndex, isActive, startSession, logSet, nextExercise, endSession } = useSessionStore()
+  const {
+    activeSession,
+    exercises,
+    currentExerciseIndex,
+    setActiveSession,
+    setExercises,
+    addSet,
+    setCurrentExerciseIndex,
+    clearSession,
+  } = useSessionStore()
   const [starting, setStarting] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTemplate?.id ?? '')
   const [elapsed, setElapsed] = useState(0)
 
   void athleteId
+
+  const isActive = activeSession !== null
+  const sessionId = activeSession?.id ?? null
 
   useEffect(() => {
     if (!isActive) return
@@ -57,25 +70,26 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
       ?.sort((a: any, b: any) => a.order_in_day - b.order_in_day)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ?.map((te: any, i: number) => ({
-        sessionExerciseId: `${session.id}-${i}`,
-        exerciseId: te.exercise_id,
-        exerciseName: te.exercise?.name ?? 'Ejercicio',
-        dayLabel: te.day_label ?? undefined,
-        orderInSession: i,
-        setsTarget: te.sets_target ?? 3,
-        repRangeMin: te.rep_range_min ?? 8,
-        repRangeMax: te.rep_range_max ?? 12,
-        rirTarget: te.rir_target ?? undefined,
-        loggedSets: [],
-        aiSuggestion: undefined,
+        id: `${session.id}-${i}`,
+        exercise_id: te.exercise_id,
+        name: te.exercise?.name ?? 'Ejercicio',
+        muscle_group_primary: te.exercise?.muscle_group_primary ?? '',
+        slug: te.exercise?.slug ?? '',
+        order_in_session: i,
+        sets: [] as import('@/stores/session.store').ActiveSet[],
       })) ?? []
 
-    startSession(session.id, selectedTemplateId || null, exs)
+    setActiveSession({
+      id: session.id,
+      athlete_id: session.athlete_id ?? '',
+      template_id: selectedTemplateId || null,
+      session_date: new Date().toISOString().split('T')[0],
+      started_at: new Date().toISOString(),
+      day_number: null,
+      day_label: null,
+    })
+    setExercises(exs)
     setStarting(false)
-  }
-
-  const handleSetLogged = async (set: SetInput) => {
-    logSet(currentExerciseIndex, set)
   }
 
   const handleEnd = async () => {
@@ -86,7 +100,7 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
         body: JSON.stringify({ ended_at: new Date().toISOString() }),
       })
     }
-    endSession()
+    clearSession()
     router.push(`/${locale}/training/history`)
   }
 
@@ -130,7 +144,7 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
 
   const currentEx = exercises[currentExerciseIndex]
   const totalExercises = exercises.length
-  const completedExercises = exercises.filter(ex => ex.loggedSets.length >= ex.setsTarget).length
+  const completedExercises = exercises.filter(ex => ex.sets.length >= DEFAULT_SETS_TARGET).length
 
   if (completedExercises === totalExercises && totalExercises > 0) {
     return (
@@ -165,32 +179,39 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
       <div className="flex-1 p-4">
         {currentEx && (
           <SetLogger
-            key={`${currentEx.exerciseId}-${currentEx.loggedSets.length + 1}`}
-            exerciseId={currentEx.exerciseId}
-            exerciseName={currentEx.exerciseName}
-            setNumber={currentEx.loggedSets.length + 1}
-            previousWeight={currentEx.lastSessionSets?.[currentEx.loggedSets.length]?.weightKg}
-            previousReps={currentEx.lastSessionSets?.[currentEx.loggedSets.length]?.repsCompleted}
+            key={`${currentEx.exercise_id}-${currentEx.sets.length + 1}`}
+            exerciseId={currentEx.exercise_id}
+            exerciseName={currentEx.name}
+            setNumber={currentEx.sets.length + 1}
+            previousWeight={currentEx.sets[currentEx.sets.length - 1]?.weight_kg ?? undefined}
+            previousReps={currentEx.sets[currentEx.sets.length - 1]?.reps_completed ?? undefined}
             onSetLogged={async (data) => {
-              await handleSetLogged({
-                setNumber: data.setNumber,
-                setType: data.isWarmup ? 'warmup' : 'working',
-                weightKg: data.weightKg,
-                repsCompleted: data.reps,
-                rirActual: data.rir,
+              addSet(currentExerciseIndex, {
+                set_number: data.setNumber,
+                set_type: data.isWarmup ? 'warmup' : 'working',
+                weight_kg: data.weightKg,
+                reps_completed: data.reps,
+                rir_actual: data.rir ?? null,
+                rpe_actual: null,
+                notes: null,
               })
-              if (currentEx.loggedSets.length + 1 >= currentEx.setsTarget) {
-                nextExercise()
+              if (currentEx.sets.length + 1 >= DEFAULT_SETS_TARGET) {
+                setCurrentExerciseIndex(Math.min(currentExerciseIndex + 1, totalExercises - 1))
               }
             }}
-            onSkip={currentExerciseIndex < totalExercises - 1 ? () => nextExercise() : undefined}
+            onSkip={currentExerciseIndex < totalExercises - 1
+              ? () => setCurrentExerciseIndex(currentExerciseIndex + 1)
+              : undefined}
           />
         )}
       </div>
 
       {currentExerciseIndex < totalExercises - 1 && (
         <div className="px-4 pb-24">
-          <button onClick={() => nextExercise()} className="w-full text-xs text-muted-foreground flex items-center justify-center gap-1 py-2">
+          <button
+            onClick={() => setCurrentExerciseIndex(currentExerciseIndex + 1)}
+            className="w-full text-xs text-muted-foreground flex items-center justify-center gap-1 py-2"
+          >
             Saltar ejercicio <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>

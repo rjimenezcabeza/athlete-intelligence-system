@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id: sessionId } = await params
+    void sessionId
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,32 +32,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await (supabase as any)
-      .from('athlete_profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
+    const body = await request.json()
+    const {
+      session_exercise_id,
+      set_number,
+      set_type,
+      weight_kg,
+      reps_completed,
+      rir_actual,
+      rpe_actual,
+      notes,
+    } = body
 
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    if (!session_exercise_id || !set_number) {
+      return NextResponse.json({ error: 'session_exercise_id and set_number required' }, { status: 400 })
     }
 
-    let body: { template_id?: string; day_number?: number; day_label?: string } = {}
-    try {
-      body = await request.json()
-    } catch {}
-
-    const { template_id, day_number, day_label } = body
-
-    const { data: session, error } = await (supabase as any)
-      .from('training_sessions')
+    const { data: set, error } = await (supabase as any)
+      .from('sets')
       .insert({
-        athlete_id: profile.id,
-        template_id: template_id || null,
-        day_number: day_number || null,
-        day_label: day_label || null,
-        started_at: new Date().toISOString(),
-        source: 'manual',
+        session_exercise_id,
+        set_number,
+        set_type: set_type || 'working',
+        weight_kg: weight_kg ?? null,
+        reps_completed: reps_completed ?? null,
+        rir_actual: rir_actual ?? null,
+        rpe_actual: rpe_actual ?? null,
+        notes: notes || null,
+        logged_at: new Date().toISOString(),
       })
       .select()
       .single()
@@ -61,7 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ session }, { status: 201 })
+    return NextResponse.json({ set }, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error inesperado'
     return NextResponse.json({ error: msg }, { status: 500 })

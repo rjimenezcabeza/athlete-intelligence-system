@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  void request
   try {
+    const { id } = await params
     const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,31 +42,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    let body: { template_id?: string; day_number?: number; day_label?: string } = {}
-    try {
-      body = await request.json()
-    } catch {}
-
-    const { template_id, day_number, day_label } = body
-
-    const { data: session, error } = await (supabase as any)
+    const { data: session, error: fetchError } = await (supabase as any)
       .from('training_sessions')
-      .insert({
-        athlete_id: profile.id,
-        template_id: template_id || null,
-        day_number: day_number || null,
-        day_label: day_label || null,
-        started_at: new Date().toISOString(),
-        source: 'manual',
+      .select('id, started_at, status')
+      .eq('id', id)
+      .eq('athlete_id', profile.id)
+      .single()
+
+    if (fetchError || !session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+
+    const endedAt = new Date()
+    let durationMinutes: number | null = null
+    if (session.started_at) {
+      const startedAt = new Date(session.started_at)
+      durationMinutes = Math.round((endedAt.getTime() - startedAt.getTime()) / 60000)
+    }
+
+    const { data, error } = await (supabase as any)
+      .from('training_sessions')
+      .update({
+        ended_at: endedAt.toISOString(),
+        duration_minutes: durationMinutes,
+        status: 'feedback_pending',
+        updated_at: endedAt.toISOString(),
       })
-      .select()
+      .eq('id', id)
+      .eq('athlete_id', profile.id)
+      .select('id, status, ended_at, duration_minutes')
       .single()
 
     if (error) {
+      console.error('[end session POST]', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ session }, { status: 201 })
+    return NextResponse.json({
+      success: true,
+      session: data,
+      redirect_to: 'feedback',
+    })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error inesperado'
     return NextResponse.json({ error: msg }, { status: 500 })

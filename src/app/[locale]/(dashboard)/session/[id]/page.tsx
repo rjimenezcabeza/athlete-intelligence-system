@@ -1,10 +1,22 @@
-import { ActiveSession } from '@/components/training/ActiveSession'
+import { ActiveSession } from '@/components/session/ActiveSession'
 
-interface Props {
-  params: Promise<{ id: string }>
+interface SessionPageProps {
+  params: Promise<{
+    locale: string
+    id: string
+  }>
 }
 
-export default async function SessionPage({ params }: Props) {
-  const { id } = await params
-  return <ActiveSession sessionId={id} />
+export default async function SessionPage({ params }: SessionPageProps) {
+  const { locale, id } = await params
+  return (
+    <ActiveSession
+      sessionId={id}
+      locale={locale}
+    />
+  )
+}
+
+export const metadata = {
+  title: 'Sesion Activa | AIS',
 }

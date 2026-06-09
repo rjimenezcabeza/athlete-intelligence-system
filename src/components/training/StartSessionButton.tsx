@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 
 interface StartSessionButtonProps {
   templateId?: string
@@ -12,6 +13,7 @@ export function StartSessionButton({ templateId, label = 'Iniciar Sesión' }: St
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const locale = useLocale()
 
   const handleStart = async () => {
     setLoading(true)
@@ -27,7 +29,7 @@ export function StartSessionButton({ templateId, label = 'Iniciar Sesión' }: St
       })
       const { sessionId, error: apiError } = await res.json()
       if (apiError) throw new Error(apiError)
-      router.push(`/session/${sessionId}`)
+      router.push(`/${locale}/session/${sessionId}`)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error al iniciar sesión')
       setLoading(false)

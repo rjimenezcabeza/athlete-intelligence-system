@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  void request
   try {
     const cookieStore = await cookies()
     const supabase = createServerClient(
@@ -34,34 +35,20 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+      return NextResponse.json({ session: null })
     }
 
-    let body: { template_id?: string; day_number?: number; day_label?: string } = {}
-    try {
-      body = await request.json()
-    } catch {}
-
-    const { template_id, day_number, day_label } = body
-
-    const { data: session, error } = await (supabase as any)
+    const { data: session } = await (supabase as any)
       .from('training_sessions')
-      .insert({
-        athlete_id: profile.id,
-        template_id: template_id || null,
-        day_number: day_number || null,
-        day_label: day_label || null,
-        started_at: new Date().toISOString(),
-        source: 'manual',
-      })
-      .select()
-      .single()
+      .select('*')
+      .eq('athlete_id', profile.id)
+      .not('started_at', 'is', null)
+      .is('ended_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ session }, { status: 201 })
+    return NextResponse.json({ session: session || null })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error inesperado'
     return NextResponse.json({ error: msg }, { status: 500 })
