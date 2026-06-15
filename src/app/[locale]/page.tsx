@@ -90,6 +90,14 @@ const COMPARISON = [
   { feature_es: 'Wearables', feature_en: 'Wearables', ais: 'Proximo', rp: 'No', jefit: 'Si' },
 ]
 
+// Nombres anonimizados para la tabla comparativa
+const COMPETITOR_LABELS = {
+  col1_es: 'App A (ciencia)',
+  col1_en: 'App A (science)',
+  col2_es: 'App B (clasica)',
+  col2_en: 'App B (classic)',
+}
+
 export default async function LandingPage({ params }: Props) {
   const { locale } = await params
   const isEs = locale === 'es'
@@ -253,8 +261,8 @@ export default async function LandingPage({ params }: Props) {
           >
             <span>{isEs ? 'Caracteristica' : 'Feature'}</span>
             <span style={{ color: '#C8FF00' }}>AIS</span>
-            <span>RP App</span>
-            <span>Jefit</span>
+            <span>{isEs ? COMPETITOR_LABELS.col1_es : COMPETITOR_LABELS.col1_en}</span>
+            <span>{isEs ? COMPETITOR_LABELS.col2_es : COMPETITOR_LABELS.col2_en}</span>
           </div>
           {COMPARISON.map((row, i) => (
             <div

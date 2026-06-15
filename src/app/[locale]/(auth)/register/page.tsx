@@ -1,11 +1,18 @@
 import { RegisterForm } from '@/components/auth/RegisterForm'
+
 export default function RegisterPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-background">
+    <main className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: '#0A0A0F' }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold tracking-tight">AIS</h1>
-          <p className="text-muted-foreground text-sm mt-1">Crea tu cuenta de atleta</p>
+          <h1 className="text-3xl font-bold tracking-tight"
+            style={{ color: '#C8FF00', fontFamily: 'Syne, sans-serif' }}>
+            AIS
+          </h1>
+          <p className="text-sm mt-1" style={{ color: '#666' }}>
+            {`Crea tu cuenta de atleta`}
+          </p>
         </div>
         <RegisterForm />
       </div>
