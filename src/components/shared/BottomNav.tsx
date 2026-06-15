@@ -1,14 +1,14 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Dumbbell, History, Bot, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, Dumbbell, Brain, Bot, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const tabs = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Panel' },
   { href: '/training/session', icon: Dumbbell, label: 'Entrenar' },
   { href: '/training/templates', icon: ClipboardList, label: 'Rutinas' },
-  { href: '/training/history', icon: History, label: 'Historial' },
+  { href: '/memory', icon: Brain, label: 'Memoria' },
   { href: '/coach', icon: Bot, label: 'Coach IA' },
 ]
 

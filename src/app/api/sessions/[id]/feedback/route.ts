@@ -99,6 +99,22 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Fire-and-forget: lanzar análisis de progresión y patrones tras completar sesión
+    if (allFieldsPresent) {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const cookieHeader = req.headers.get('cookie') || ''
+      fetch(`${baseUrl}/api/progression/calculate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Cookie': cookieHeader },
+        body: JSON.stringify({ session_id: id })
+      }).catch(() => {})
+      fetch(`${baseUrl}/api/memory/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Cookie': cookieHeader },
+        body: JSON.stringify({ session_id: id })
+      }).catch(() => {})
+    }
+
     return NextResponse.json({ success: true, session: data, completed: allFieldsPresent })
   } catch (err: unknown) {
     console.error('[feedback POST] unexpected:', err)
