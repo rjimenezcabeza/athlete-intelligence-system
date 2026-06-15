@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { useSubscription } from '@/hooks/useSubscription'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,6 +16,7 @@ export default function ProfilePage() {
   const locale = (params?.locale as string) ?? 'es'
   const isEs = locale === 'es'
   const [profile, setProfile] = useState<any>(null)
+  const { openPortal, loading: portalLoading } = useSubscription(locale)
 
   useEffect(() => {
     ;(async () => {
@@ -63,12 +65,28 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {profile.subscription_tier === 'free' && (
+        {profile.subscription_tier === 'free' ? (
           <div className="rounded-2xl p-4" style={{ background: '#1a2a00', border: '1px solid #C8FF0033' }}>
             <p className="font-bold mb-1" style={{ color: '#C8FF00' }}>{isEs ? 'Actualiza a Pro' : 'Upgrade to Pro'}</p>
-            <p className="text-xs mb-3" style={{ color: '#888' }}>{isEs ? 'AI Coach, progresion automatica, sin limites' : 'AI Coach, auto progression, unlimited'}</p>
-            <button className="w-full py-3 rounded-xl font-bold text-sm" style={{ background: '#C8FF00', color: '#0A0A0F' }}>
-              {isEs ? 'Ver planes' : 'See plans'} — E14.99/mes
+            <p className="text-xs mb-3" style={{ color: '#888' }}>
+              {isEs ? 'AI Coach, progresion automatica, importaciones ilimitadas' : 'AI Coach, auto progression, unlimited imports'}
+            </p>
+            <a href={`/${locale}/upgrade`}
+              className="block w-full py-3 rounded-xl font-bold text-sm text-center"
+              style={{ background: '#C8FF00', color: '#0A0A0F' }}>
+              {isEs ? 'Ver planes' : 'See plans'} - EUR 14.99/mes
+            </a>
+          </div>
+        ) : (
+          <div className="rounded-2xl p-4" style={{ background: '#111118', border: '1px solid #1a1a2e' }}>
+            <p className="font-bold mb-1" style={{ color: '#C8FF00' }}>Pro activo</p>
+            <p className="text-xs mb-3" style={{ color: '#888' }}>
+              {isEs ? 'Acceso completo al sistema' : 'Full system access'}
+            </p>
+            <button onClick={openPortal} disabled={portalLoading}
+              className="w-full py-3 rounded-xl text-sm disabled:opacity-50"
+              style={{ background: '#1a1a2e', color: '#aaa' }}>
+              {portalLoading ? '...' : (isEs ? 'Gestionar suscripcion' : 'Manage subscription')}
             </button>
           </div>
         )}

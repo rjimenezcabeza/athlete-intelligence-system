@@ -34,8 +34,29 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { data: profile } = await (supabase as any)
-      .from('athlete_profiles').select('id').eq('user_id', user.id).single()
+      .from('athlete_profiles').select('id, subscription_tier').eq('user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+
+    // Limite free tier: 3 importaciones por mes
+    if (profile.subscription_tier === 'free') {
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+
+      const { count } = await (supabase as any)
+        .from('imported_files')
+        .select('*', { count: 'exact', head: true })
+        .eq('athlete_id', profile.id)
+        .gte('uploaded_at', startOfMonth.toISOString())
+
+      if ((count ?? 0) >= 3) {
+        return NextResponse.json({
+          error: 'LIMIT_REACHED',
+          message: 'Free plan: 3 imports/month. Upgrade to Pro for unlimited.',
+          upgrade_url: '/upgrade'
+        }, { status: 403 })
+      }
+    }
 
     const formData = await req.formData()
     const file = formData.get('file') as File | null
