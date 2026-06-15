@@ -1,6 +1,6 @@
 import { createServerSideClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { BottomNav } from '@/components/shared/BottomNav'
+import BottomNav from '@/components/layout/BottomNav'
 import { OfflineIndicator } from '@/components/shared/OfflineIndicator'
 
 export default async function DashboardLayout({
@@ -15,9 +15,9 @@ export default async function DashboardLayout({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale}/login`)
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen" style={{ background: '#0A0A0F' }}>
       <OfflineIndicator />
-      <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
+      <main className="flex-1 pb-24 overflow-y-auto">{children}</main>
       <BottomNav locale={locale} />
     </div>
   )
