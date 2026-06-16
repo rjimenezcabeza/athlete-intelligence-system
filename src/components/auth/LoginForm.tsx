@@ -22,10 +22,13 @@ export function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password })
       })
+      if (res.ok) {
+        window.location.href = '/' + locale + '/dashboard'
+        return
+      }
       const json = await res.json()
-      if (!res.ok) { setError(json.error ?? 'Error al iniciar sesion'); setLoading(false); return }
-      router.push('/' + locale + '/dashboard')
-      router.refresh()
+      setError(json.error ?? 'Error al iniciar sesion')
+      setLoading(false)
     } catch (err) {
       setError('Error de red. Intentalo de nuevo.')
       setLoading(false)
