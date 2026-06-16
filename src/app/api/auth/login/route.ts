@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     const { email, password } = await request.json()
     const cookieStore = await cookies()
     const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
-    const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim()
+    const anonKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
 
     const successResponse = NextResponse.json({ success: true })
 
