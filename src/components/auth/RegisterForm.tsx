@@ -8,7 +8,7 @@ export function RegisterForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null as string | null)
+  const [error, setError] = useState<string | null>(null)
   const isEs = locale === 'es'
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -19,14 +19,13 @@ export function RegisterForm() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password, displayName: displayName.trim(), locale })
+        body: JSON.stringify({ email: email.trim(), password, displayName: displayName.trim(), locale }),
       })
       const json = await res.json()
       if (!res.ok) { setError(json.error ?? 'Error'); setLoading(false); return }
-      // Ir al login para que el usuario inicie sesion con sus credenciales
       window.location.href = '/' + locale + '/login?registered=1'
     } catch {
-      setError(isEs ? 'Error de red. Intentalo de nuevo.' : 'Network error.')
+      setError(isEs ? 'Error de red.' : 'Network error.')
       setLoading(false)
     }
   }
@@ -42,24 +41,24 @@ export function RegisterForm() {
     <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
         <label style={lbl}>{isEs ? 'Nombre' : 'Name'}</label>
-        <input type='text' value={displayName} onChange={e => setDisplayName(e.target.value)}
+        <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)}
           placeholder={isEs ? 'Tu nombre' : 'Your name'} required style={inp} />
       </div>
       <div>
         <label style={lbl}>Email</label>
-        <input type='email' value={email} onChange={e => setEmail(e.target.value)}
-          placeholder='atleta@ejemplo.com' required autoComplete='email' style={inp} />
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+          placeholder="atleta@ejemplo.com" required autoComplete="email" style={inp} />
       </div>
       <div>
         <label style={lbl}>{isEs ? 'Contrasena' : 'Password'}</label>
-        <input type='password' value={password} onChange={e => setPassword(e.target.value)}
-          required minLength={8} autoComplete='new-password' style={inp} />
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+          required minLength={8} autoComplete="new-password" style={inp} />
         <p style={{ fontSize: '11px', color: '#555', marginTop: '4px' }}>
           {isEs ? 'Minimo 8 caracteres' : 'Minimum 8 characters'}
         </p>
       </div>
       {error && <p style={{ color: '#FF6B6B', fontSize: '13px' }}>{error}</p>}
-      <button type='submit' disabled={loading} style={{
+      <button type="submit" disabled={loading} style={{
         background: '#C8FF00', color: '#0A0A0F', border: 'none',
         borderRadius: '12px', padding: '14px', fontSize: '15px',
         fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer',

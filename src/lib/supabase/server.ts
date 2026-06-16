@@ -1,26 +1,55 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import type { Database } from '@/types/database.types'
 
-// Cliente admin con SERVICE_ROLE_KEY — sin BOM, sin browser
+const url = () => (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
+const serviceKey = () => (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+const anonKey = () => (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim()
+
+// Admin client — usa SERVICE_ROLE_KEY, sin BOM, para queries
 export function createAdminClient() {
-  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
-  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
-  return createClient<Database>(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+  return createClient(url(), serviceKey(), {
+    auth: { autoRefreshToken: false, persistSession: false }
+  })
 }
 
-// Cliente SSR para leer sesion desde cookies (login/logout/getUser)
+// SSR client — usa anon key para leer/escribir cookies de sesion
 export async function createServerSideClient() {
   const cookieStore = await cookies()
-  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
-  const key = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim()
-  return createServerClient<Database>(url, key, {
+  return createServerClient(url(), anonKey(), {
     cookies: {
       getAll() { return cookieStore.getAll() },
       setAll(toSet) {
-        toSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+        toSet.forEach(({ name, value, options }) =>
+          cookieStore.set(name, value, options)
+        )
       },
     },
   })
+}
+
+// Obtener user_id desde cookies usando SERVICE_ROLE_KEY para validar JWT
+// Esto evita el BOM en browser pero en Node el BOM no afecta a fetch
+export async function getUserFromCookies() {
+  const cookieStore = await cookies()
+  const allCookies = cookieStore.getAll()
+  // Buscar el access token en las cookies de Supabase
+  const tokenCookie = allCookies.find(c =>
+    c.name.includes('access-token') || c.name.includes('auth-token') || c.name.startsWith('sb-')
+  )
+  if (!tokenCookie) return null
+  try {
+    const admin = createAdminClient()
+    // Intentar con SSR client primero (lee JWT de cookies)
+    const supa = createServerClient(url(), serviceKey(), {
+      cookies: {
+        getAll() { return allCookies },
+        setAll() {},
+      },
+    })
+    const { data: { user } } = await supa.auth.getUser()
+    return user
+  } catch {
+    return null
+  }
 }

@@ -24,5 +24,5 @@ export default async function HistoryPage() {
     .order('started_at', { ascending: false })
     .limit(30)
 
-  return <HistoryClient sessions={sessions ?? []} weightUnit={profile?.weight_unit ?? 'kg'} />
+  return <HistoryClient sessions={(sessions ?? []) as any} weightUnit={profile?.weight_unit ?? 'kg'} />
 }

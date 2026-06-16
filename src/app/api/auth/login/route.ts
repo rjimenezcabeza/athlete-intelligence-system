@@ -8,7 +8,9 @@ export async function POST(request: Request) {
     const cookieStore = await cookies()
     const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
     const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim()
+
     const successResponse = NextResponse.json({ success: true })
+
     const supabase = createServerClient(url, anonKey, {
       cookies: {
         getAll() { return cookieStore.getAll() },
@@ -17,10 +19,15 @@ export async function POST(request: Request) {
             cookieStore.set(name, value, options)
             successResponse.cookies.set(name, value, options as any)
           })
-        }
-      }
+        },
+      },
     })
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
+
     if (error) return NextResponse.json({ error: error.message }, { status: 401 })
     return successResponse
   } catch (err) {

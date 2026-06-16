@@ -7,7 +7,7 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null as string | null)
+  const [error, setError] = useState<string | null>(null)
   const isEs = locale === 'es'
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -18,10 +18,9 @@ export function LoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password })
+        body: JSON.stringify({ email: email.trim(), password }),
       })
       if (res.ok) {
-        // Recarga completa para que el layout lea las cookies de sesion
         window.location.href = '/' + locale + '/dashboard'
         return
       }
@@ -29,7 +28,7 @@ export function LoginForm() {
       setError(json.error ?? (isEs ? 'Credenciales incorrectas' : 'Invalid credentials'))
       setLoading(false)
     } catch {
-      setError(isEs ? 'Error de red. Intentalo de nuevo.' : 'Network error. Please try again.')
+      setError(isEs ? 'Error de red.' : 'Network error.')
       setLoading(false)
     }
   }
@@ -45,16 +44,16 @@ export function LoginForm() {
     <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
         <label style={lbl}>Email</label>
-        <input type='email' value={email} onChange={e => setEmail(e.target.value)}
-          placeholder='atleta@ejemplo.com' required autoComplete='email' style={inp} />
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+          placeholder="atleta@ejemplo.com" required autoComplete="email" style={inp} />
       </div>
       <div>
         <label style={lbl}>{isEs ? 'Contrasena' : 'Password'}</label>
-        <input type='password' value={password} onChange={e => setPassword(e.target.value)}
-          required autoComplete='current-password' style={inp} />
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+          required autoComplete="current-password" style={inp} />
       </div>
       {error && <p style={{ color: '#FF6B6B', fontSize: '13px' }}>{error}</p>}
-      <button type='submit' disabled={loading} style={{
+      <button type="submit" disabled={loading} style={{
         background: '#C8FF00', color: '#0A0A0F', border: 'none',
         borderRadius: '12px', padding: '14px', fontSize: '15px',
         fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer',
