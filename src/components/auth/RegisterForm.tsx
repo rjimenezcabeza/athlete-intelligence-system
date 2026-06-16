@@ -25,15 +25,19 @@ export function RegisterForm() {
           email: email.trim(),
           password,
           displayName: displayName.trim(),
-          locale,
+          locale
         })
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error); setLoading(false); return }
+      if (!res.ok) {
+        setError(data.error ?? (isEs ? 'Error al crear la cuenta' : 'Error creating account'))
+        setLoading(false)
+        return
+      }
       router.push(`/${locale}/onboarding`)
       router.refresh()
-    } catch (err: any) {
-      setError(isEs ? 'Error al crear la cuenta. Intentalo de nuevo.' : 'Error creating account. Please try again.')
+    } catch (err) {
+      setError(isEs ? 'Error de red. Intentalo de nuevo.' : 'Network error. Please try again.')
       setLoading(false)
     }
   }
@@ -74,7 +78,9 @@ export function RegisterForm() {
           cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1,
           width: '100%',
         }}>
-        {loading ? (isEs ? 'Creando cuenta...' : 'Creating account...') : (isEs ? 'Crear cuenta' : 'Create account')}
+        {loading
+          ? (isEs ? 'Creando cuenta...' : 'Creating account...')
+          : (isEs ? 'Crear cuenta' : 'Create account')}
       </button>
       <p style={{ textAlign: 'center', fontSize: '13px', color: '#666' }}>
         {isEs ? 'Ya tienes cuenta? ' : 'Already have an account? '}
