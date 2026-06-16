@@ -2,12 +2,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
-import { createClient } from '@/lib/supabase/client'
 
 export function RegisterForm() {
   const router = useRouter()
   const locale = useLocale()
-  const supabase = createClient()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -15,32 +13,23 @@ export function RegisterForm() {
   const [error, setError] = useState<string | null>(null)
   const isEs = locale === 'es'
 
-  const sanitize = (str: string) => str.replace(/[^\x20-\x7E]/g, '')
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     try {
-      const safeEmail = sanitize(email).trim()
-      const safeName = displayName.trim()
-      const tz = sanitize(Intl.DateTimeFormat().resolvedOptions().timeZone)
-      const { data, error } = await supabase.auth.signUp({
-        email: safeEmail,
-        password,
-        options: { data: { display_name: safeName } }
-      })
-      if (error) { setError(error.message); setLoading(false); return }
-      if (data.user) {
-        await supabase.from('athlete_profiles').insert({
-          user_id: data.user.id,
-          display_name: safeName,
-          weight_unit: 'kg',
-          language: locale,
-          timezone: tz || 'Europe/Madrid',
-          subscription_tier: 'free',
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          displayName: displayName.trim(),
+          locale,
         })
-      }
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error); setLoading(false); return }
       router.push(`/${locale}/onboarding`)
       router.refresh()
     } catch (err: any) {
