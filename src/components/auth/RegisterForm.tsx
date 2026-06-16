@@ -1,16 +1,14 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 
 export function RegisterForm() {
-  const router = useRouter()
   const locale = useLocale()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null as string | null)
   const isEs = locale === 'es'
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -25,17 +23,19 @@ export function RegisterForm() {
       })
       const json = await res.json()
       if (!res.ok) { setError(json.error ?? 'Error'); setLoading(false); return }
-      router.push('/' + locale + '/onboarding')
-      router.refresh()
-    } catch (err) {
-      setError('Error de red. Intentalo de nuevo.')
+      // Ir al login para que el usuario inicie sesion con sus credenciales
+      window.location.href = '/' + locale + '/login?registered=1'
+    } catch {
+      setError(isEs ? 'Error de red. Intentalo de nuevo.' : 'Network error.')
       setLoading(false)
     }
   }
 
-  const inp: React.CSSProperties = { width: '100%', background: '#111118', border: '1px solid #333',
+  const inp: React.CSSProperties = {
+    width: '100%', background: '#111118', border: '1px solid #333',
     borderRadius: '12px', padding: '12px 16px', color: '#fff',
-    fontSize: '15px', outline: 'none', boxSizing: 'border-box' }
+    fontSize: '15px', outline: 'none', boxSizing: 'border-box',
+  }
   const lbl: React.CSSProperties = { display: 'block', fontSize: '13px', color: '#888', marginBottom: '6px' }
 
   return (
@@ -63,7 +63,8 @@ export function RegisterForm() {
         background: '#C8FF00', color: '#0A0A0F', border: 'none',
         borderRadius: '12px', padding: '14px', fontSize: '15px',
         fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer',
-        opacity: loading ? 0.6 : 1, width: '100%' }}>
+        opacity: loading ? 0.6 : 1, width: '100%',
+      }}>
         {loading ? (isEs ? 'Creando...' : 'Creating...') : (isEs ? 'Crear cuenta' : 'Create account')}
       </button>
       <p style={{ textAlign: 'center', fontSize: '13px', color: '#666' }}>

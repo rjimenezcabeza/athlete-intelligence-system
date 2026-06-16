@@ -15,9 +15,9 @@ export default async function DashboardLayout({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale}/login`)
   return (
-    <div className="min-h-screen" style={{ background: '#0A0A0F' }}>
+    <div className='min-h-screen' style={{ background: '#0A0A0F' }}>
       <OfflineIndicator />
-      <main className="flex-1 pb-24 overflow-y-auto">{children}</main>
+      <main className='flex-1 pb-24 overflow-y-auto'>{children}</main>
       <BottomNav locale={locale} />
     </div>
   )
