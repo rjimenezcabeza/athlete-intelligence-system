@@ -15,28 +15,38 @@ export function RegisterForm() {
   const [error, setError] = useState<string | null>(null)
   const isEs = locale === 'es'
 
+  const sanitize = (str: string) => str.replace(/[^\x20-\x7E]/g, '')
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { display_name: displayName } }
-    })
-    if (error) { setError(error.message); setLoading(false); return }
-    if (data.user) {
-      await supabase.from('athlete_profiles').insert({
-        user_id: data.user.id,
-        display_name: displayName,
-        weight_unit: 'kg',
-        language: locale,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/[^\x00-\x7F]/g, ''),
-        subscription_tier: 'free',
+    try {
+      const safeEmail = sanitize(email).trim()
+      const safeName = displayName.trim()
+      const tz = sanitize(Intl.DateTimeFormat().resolvedOptions().timeZone)
+      const { data, error } = await supabase.auth.signUp({
+        email: safeEmail,
+        password,
+        options: { data: { display_name: safeName } }
       })
+      if (error) { setError(error.message); setLoading(false); return }
+      if (data.user) {
+        await supabase.from('athlete_profiles').insert({
+          user_id: data.user.id,
+          display_name: safeName,
+          weight_unit: 'kg',
+          language: locale,
+          timezone: tz || 'Europe/Madrid',
+          subscription_tier: 'free',
+        })
+      }
+      router.push(`/${locale}/onboarding`)
+      router.refresh()
+    } catch (err: any) {
+      setError(isEs ? 'Error al crear la cuenta. Intentalo de nuevo.' : 'Error creating account. Please try again.')
+      setLoading(false)
     }
-    router.push(`/${locale}/onboarding`)
-    router.refresh()
   }
 
   const inputStyle = {
