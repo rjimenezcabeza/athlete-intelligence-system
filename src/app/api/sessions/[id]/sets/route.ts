@@ -48,6 +48,33 @@ export async function POST(
       return NextResponse.json({ error: 'session_exercise_id and set_number required' }, { status: 400 })
     }
 
+    // Get athlete profile for the user
+    const { data: athleteProfile, error: athleteError } = await (supabase as any)
+      .from('athlete_profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (athleteError || !athleteProfile) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Get session_exercise with its session, verify athlete_id matches
+    const { data: sessionExercise, error: seError } = await (supabase as any)
+      .from('session_exercises')
+      .select('id, training_sessions(athlete_id)')
+      .eq('id', session_exercise_id)
+      .single()
+
+    if (seError || !sessionExercise) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Verify the session belongs to this user's athlete
+    if (sessionExercise.training_sessions?.athlete_id !== athleteProfile.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { data: set, error } = await (supabase as any)
       .from('sets')
       .insert({
