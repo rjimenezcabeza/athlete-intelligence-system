@@ -131,7 +131,10 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
       margin: '0 auto',
       fontFamily: 'Inter, sans-serif',
     }}>
-      <style>{`@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
+      <style>{`
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes timerPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.75; } }
+      `}</style>
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -140,10 +143,11 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
       }}>
         <div style={{
           color: '#C8FF00',
-          fontSize: '28px',
+          fontSize: '48px',
           fontWeight: '700',
           fontFamily: 'DM Mono, monospace',
-          letterSpacing: '0.05em',
+          letterSpacing: '-0.02em',
+          animation: 'timerPulse 2s ease-in-out infinite',
         }}>
           {formatTime(elapsedSeconds)}
         </div>
@@ -151,10 +155,10 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
           onClick={handleEndSession}
           disabled={ending}
           style={{
-            background: 'transparent',
-            border: '1px solid #ff4444',
+            background: 'rgba(255, 107, 107, 0.08)',
+            border: '1px solid rgba(255, 107, 107, 0.5)',
             borderRadius: '8px',
-            color: '#ff4444',
+            color: '#ff6b6b',
             padding: '8px 16px',
             fontSize: '13px',
             fontWeight: '600',
