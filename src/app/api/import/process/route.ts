@@ -1,31 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { NextRequest, NextResponse } from 'next/server'
 
-async function createDb() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cs) => cs.forEach(({ name, value, options }) =>
-          cookieStore.set(name, value, options)
-        )
-      }
-    }
+export const maxDuration = 60
+
+function db() {
+  return createClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
   )
 }
 
-const EXTRACTION_PROMPT = `You are a fitness data extractor for the Athlete Intelligence System.
+const PROMPT = `You are a fitness data extractor for the Athlete Intelligence System.
 Analyze the training data and extract structured workout information.
-
 Return ONLY valid JSON, no markdown, no explanation:
 {
   "confidence": 0.0-1.0,
-  "extraction_notes": "Brief description of what was found",
+  "extraction_notes": "brief description",
   "sessions": [
     {
       "date": "YYYY-MM-DD or null",
@@ -42,7 +33,6 @@ Return ONLY valid JSON, no markdown, no explanation:
     }
   ]
 }
-
 Rules:
 - Convert lbs to kg (divide by 2.205) if lbs detected
 - set_type: warmup, working, top_set, or backoff
@@ -51,15 +41,14 @@ Rules:
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createDb()
-    const { data: { user } } = await (supabase as any).auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { importId, userId } = await req.json()
+    if (!importId || !userId) return NextResponse.json({ error: 'importId and userId required' }, { status: 400 })
 
-    const { importId } = await req.json()
-    if (!importId) return NextResponse.json({ error: 'importId required' }, { status: 400 })
+    const supabase = db()
 
+    // Verify ownership: athlete profile must belong to userId AND imported_file must belong to that athlete
     const { data: profile } = await (supabase as any)
-      .from('athlete_profiles').select('id').eq('user_id', user.id).single()
+      .from('athlete_profiles').select('id').eq('user_id', userId).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
     const { data: importRecord } = await (supabase as any)
@@ -78,16 +67,18 @@ export async function POST(req: NextRequest) {
     if (importRecord.file_type === 'image') {
       const bytes = await fileData.arrayBuffer()
       const base64 = Buffer.from(bytes).toString('base64')
+      const ext = importRecord.storage_path.split('.').pop()?.toLowerCase() ?? 'jpeg'
+      const mimeMap: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/jpeg'
+      }
+      const mimeType = (mimeMap[ext] ?? 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg' as any, data: base64 } },
-            { type: 'text', text: EXTRACTION_PROMPT }
-          ]
-        }]
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+          { type: 'text', text: PROMPT }
+        ]}]
       })
       const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
       extractedData = JSON.parse(text.replace(/```json|```/g, '').trim())
@@ -95,12 +86,9 @@ export async function POST(req: NextRequest) {
       let textContent = ''
       try { textContent = await fileData.text() } catch { textContent = 'Could not extract text' }
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: `${EXTRACTION_PROMPT}\n\nData:\n\n${textContent.slice(0, 8000)}`
-        }]
+        messages: [{ role: 'user', content: PROMPT + '\n\nData:\n\n' + textContent.slice(0, 8000) }]
       })
       const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
       extractedData = JSON.parse(text.replace(/```json|```/g, '').trim())
@@ -108,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     const confidence = extractedData?.confidence ?? 0
 
-    if (extractedData?.sessions && extractedData.sessions.length > 0) {
+    if (extractedData?.sessions?.length > 0) {
       const reviewItems = extractedData.sessions.map((session: any) => ({
         imported_file_id: importId,
         item_type: 'session',
@@ -131,13 +119,9 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', importId)
 
-    return NextResponse.json({
-      success: true,
-      confidence,
-      sessionsFound: extractedData?.sessions?.length ?? 0,
-      status: newStatus
-    })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return NextResponse.json({ success: true, confidence, sessionsFound: extractedData?.sessions?.length ?? 0, status: newStatus })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
