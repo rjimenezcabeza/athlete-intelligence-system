@@ -15,19 +15,34 @@ async function getUser() {
   return user
 }
 
-function db() { return createClient(getUrl(), getSvcKey()) }
+function db() {
+  return createClient(getUrl(), getSvcKey(), { auth: { autoRefreshToken: false, persistSession: false } })
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const admin = db()
+    const { data: profile } = await (admin as any)
+      .from('athlete_profiles').select('id').eq('user_id', user.id).single()
+    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+
     const body = await request.json().catch(() => ({}))
-    const { error } = await db().from('training_sessions').update({
-      pump_rating: body.pump_rating ?? null, local_fatigue: body.local_fatigue ?? null,
-      perceived_recovery: body.perceived_recovery ?? null, rir_session_avg: body.rir_session_avg ?? null,
-    }).eq('id', id)
+    const { error } = await (admin as any).from('training_sessions').update({
+      pump_rating: body.pump_rating ?? null,
+      local_fatigue: body.local_fatigue ?? null,
+      perceived_recovery: body.perceived_recovery ?? null,
+      rir_session_avg: body.rir_session_avg ?? null,
+      status: 'completed',
+      ended_at: new Date().toISOString()
+    }).eq('id', id).eq('athlete_id', profile.id)
+
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+  }
 }

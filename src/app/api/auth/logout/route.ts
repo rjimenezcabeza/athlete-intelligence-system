@@ -1,27 +1,21 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export async function POST() {
-  try {
-    const cookieStore = await cookies()
-    const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
-    const svc = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
-    const response = NextResponse.json({ success: true })
-    const supabase = createServerClient(url, svc, {
+  const store = await cookies()
+  const supabase = createServerClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim(),
+    {
       cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(toSet) {
-          toSet.forEach(({ name, value, options }: any) => {
-            cookieStore.set(name, value, options)
-            response.cookies.set(name, value, options)
-          })
-        }
+        getAll() { return store.getAll() },
+        setAll(cs) { cs.forEach(({ name, value, options }) => store.set(name, value, options)) }
       }
-    })
-    await supabase.auth.signOut()
-    return response
-  } catch (e: any) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    }
+  )
+  await supabase.auth.signOut()
+  const res = NextResponse.json({ success: true })
+  store.getAll().forEach(c => res.cookies.delete(c.name))
+  return res
 }

@@ -1,103 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+function db() {
+  return createClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+async function getUser() {
+  const store = await cookies()
+  const s = createServerClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { cookies: { getAll() { return store.getAll() }, setAll() {} } }
+  )
+  return (await s.auth.getUser()).data.user
+}
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { id: sessionId } = await params
-    void sessionId
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll() },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              )
-            } catch {}
-          },
-        },
-      }
-    )
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const {
-      session_exercise_id,
-      set_number,
-      set_type,
-      weight_kg,
-      reps_completed,
-      rir_actual,
-      rpe_actual,
-      notes,
-    } = body
-
+    const body = await req.json()
+    const { session_exercise_id, set_number, set_type, weight_kg, reps_completed, rir_actual, notes } = body
     if (!session_exercise_id || !set_number) {
-      return NextResponse.json({ error: 'session_exercise_id and set_number required' }, { status: 400 })
+      return NextResponse.json({ error: 'session_exercise_id y set_number requeridos' }, { status: 400 })
     }
-
-    // Get athlete profile for the user
-    const { data: athleteProfile, error: athleteError } = await (supabase as any)
-      .from('athlete_profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (athleteError || !athleteProfile) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // Get session_exercise with its session, verify athlete_id matches
-    const { data: sessionExercise, error: seError } = await (supabase as any)
-      .from('session_exercises')
-      .select('id, training_sessions(athlete_id)')
-      .eq('id', session_exercise_id)
-      .single()
-
-    if (seError || !sessionExercise) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // Verify the session belongs to this user's athlete
-    if (sessionExercise.training_sessions?.athlete_id !== athleteProfile.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    const { data: set, error } = await (supabase as any)
+    const admin = db()
+    const { data: setData, error } = await (admin as any)
       .from('sets')
       .insert({
         session_exercise_id,
         set_number,
-        set_type: set_type || 'working',
+        set_type: set_type ?? 'working',
         weight_kg: weight_kg ?? null,
         reps_completed: reps_completed ?? null,
         rir_actual: rir_actual ?? null,
-        rpe_actual: rpe_actual ?? null,
-        notes: notes || null,
-        logged_at: new Date().toISOString(),
+        notes: notes ?? null,
+        logged_at: new Date().toISOString()
       })
-      .select()
+      .select('id, set_number, weight_kg, reps_completed, rir_actual, logged_at')
       .single()
+    if (error) throw error
+    return NextResponse.json({ set: setData })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+  }
+}
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ set }, { status: 201 })
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Error inesperado'
-    return NextResponse.json({ error: msg }, { status: 500 })
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { setId } = await req.json()
+    if (!setId) return NextResponse.json({ error: 'setId requerido' }, { status: 400 })
+    const admin = db()
+    await (admin as any).from('sets').delete().eq('id', setId)
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 }

@@ -1,194 +1,153 @@
 'use client'
-
 import { useState } from 'react'
-import { useSessionStore, ActiveSet } from '@/stores/session.store'
+import { useSessionStore } from '@/stores/session.store'
 
 interface SetLoggerProps {
   sessionId: string
   sessionExerciseId: string
   exerciseIndex: number
   setNumber: number
-  lastSet?: ActiveSet | null
+  lastSet?: any
 }
 
-export function SetLogger({
-  sessionId,
-  sessionExerciseId,
-  exerciseIndex,
-  setNumber,
-  lastSet,
-}: SetLoggerProps) {
+const TYPES = [
+  { key: 'working',  label: 'Working',  color: '#C8FF00' },
+  { key: 'warmup',   label: 'Warm-up',  color: '#FBBF24' },
+  { key: 'top_set',  label: 'Top Set',  color: '#A78BFA' },
+  { key: 'backoff',  label: 'Back-off', color: '#60A5FA' },
+]
+
+export function SetLogger({ sessionId, sessionExerciseId, exerciseIndex, setNumber, lastSet }: SetLoggerProps) {
   const { addSet } = useSessionStore()
-  const [weight, setWeight] = useState(lastSet?.weight_kg?.toString() || '')
-  const [reps, setReps] = useState(lastSet?.reps_completed?.toString() || '')
-  const [rir, setRir] = useState(lastSet?.rir_actual?.toString() || '2')
+  const [weight, setWeight] = useState(lastSet?.weight_kg?.toString() ?? '')
+  const [reps, setReps] = useState(lastSet?.reps_completed?.toString() ?? '')
+  const [rir, setRir] = useState(lastSet?.rir_actual?.toString() ?? '2')
+  const [type, setType] = useState('working')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState('')
 
-  async function handleLog() {
+  const numStyle: React.CSSProperties = {
+    width: '100%', textAlign: 'center', background: '#16161f',
+    border: '1.5px solid rgba(255,255,255,0.08)', borderRadius: 14,
+    color: '#F0F0F5', fontFamily: 'DM Mono, monospace',
+    fontSize: 30, fontWeight: 700, padding: '14px 6px', outline: 'none',
+    WebkitAppearance: 'none', MozAppearance: 'textfield'
+  }
+  const labelStyle: React.CSSProperties = {
+    display: 'block', color: '#44445a', fontSize: 10, fontWeight: 700,
+    letterSpacing: '0.12em', textTransform: 'uppercase',
+    fontFamily: 'Syne, sans-serif', marginBottom: 6
+  }
+
+  const handleLog = async () => {
     if (!weight || !reps) return
-    setSaving(true)
-
+    setSaving(true); setErr('')
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/sets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch('/api/sessions/' + sessionId + '/sets', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_exercise_id: sessionExerciseId,
-          set_number: setNumber,
-          set_type: 'working',
-          weight_kg: parseFloat(weight),
-          reps_completed: parseInt(reps),
-          rir_actual: rir ? parseInt(rir) : null,
-          notes: null,
-        }),
+          session_exercise_id: sessionExerciseId, set_number: setNumber,
+          set_type: type, weight_kg: parseFloat(weight),
+          reps_completed: parseInt(reps), rir_actual: rir ? parseInt(rir) : null
+        })
       })
-
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error)
-
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
       addSet(exerciseIndex, {
-        id: data.set.id,
-        set_number: setNumber,
-        set_type: 'working',
-        weight_kg: parseFloat(weight),
-        reps_completed: parseInt(reps),
-        rir_actual: rir ? parseInt(rir) : null,
-        rpe_actual: null,
-        notes: null,
-        logged_at: data.set.logged_at,
+        id: data.set.id, set_number: setNumber, set_type: type as any,
+        weight_kg: parseFloat(weight), reps_completed: parseInt(reps),
+        rir_actual: rir ? parseInt(rir) : null, rpe_actual: null, notes: null,
+        logged_at: data.set.logged_at
       })
-
       setSaved(true)
       setTimeout(() => setSaved(false), 1500)
-    } catch (err: unknown) {
-      console.error(err)
-    } finally {
-      setSaving(false)
-    }
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    setSaving(false)
   }
 
-  const inputStyle = {
-    background: '#1a1a2e',
-    border: '1px solid #333',
-    borderRadius: '8px',
-    color: '#fff',
-    fontSize: '28px',
-    fontWeight: '700',
-    textAlign: 'center' as const,
-    width: '100%',
-    padding: '20px 8px',
-    fontFamily: 'DM Mono, monospace',
-    outline: 'none',
-  }
+  return (
+    <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, padding: 20, marginBottom: 12 }}>
+      {/* Type selector */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {TYPES.map(t => (
+          <button key={t.key} onClick={() => setType(t.key)} style={{
+            flex: 1, padding: '7px 4px', borderRadius: 9,
+            fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif',
+            cursor: 'pointer', letterSpacing: '0.05em',
+            background: type === t.key ? t.color + '22' : 'transparent',
+            color: type === t.key ? t.color : '#44445a',
+            border: '1px solid ' + (type === t.key ? t.color + '44' : '#1a1a2e'),
+            transition: 'all 0.15s'
+          }}>{t.label}</button>
+        ))}
+      </div>
 
-  const labelStyle = {
-    color: '#666',
-    fontSize: '11px',
-    fontWeight: '600',
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase' as const,
-    marginBottom: '4px',
-    fontFamily: 'Syne, sans-serif',
+      {/* Inputs */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+        <div><span style={labelStyle}>KG</span><input type="number" value={weight} onChange={e => setWeight(e.target.value)} style={numStyle} inputMode="decimal" placeholder="0" onFocus={e => (e.target.style.borderColor = 'rgba(200,255,0,0.5)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} /></div>
+        <div><span style={labelStyle}>REPS</span><input type="number" value={reps} onChange={e => setReps(e.target.value)} style={numStyle} inputMode="numeric" placeholder="0" onFocus={e => (e.target.style.borderColor = 'rgba(200,255,0,0.5)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} /></div>
+        <div><span style={labelStyle}>RIR</span><input type="number" value={rir} onChange={e => setRir(e.target.value)} style={numStyle} inputMode="numeric" placeholder="2" onFocus={e => (e.target.style.borderColor = 'rgba(200,255,0,0.5)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} /></div>
+      </div>
+
+      {err && <p style={{ color: '#FF6B6B', fontSize: 12, marginBottom: 10, textAlign: 'center' }}>{err}</p>}
+
+      <button onClick={handleLog} disabled={saving || !weight || !reps} style={{
+        width: '100%', border: 'none', borderRadius: 13, padding: 17,
+        fontSize: 14, fontWeight: 700, fontFamily: 'Syne, sans-serif',
+        letterSpacing: '0.06em', textTransform: 'uppercase',
+        cursor: (saving || !weight || !reps) ? 'not-allowed' : 'pointer',
+        transition: 'all 0.2s',
+        background: saved ? '#22c55e' : saving ? '#1a1a2e' : 'linear-gradient(135deg,#C8FF00,#88DD00)',
+        color: (saved || saving) ? '#fff' : '#0A0A0F',
+        opacity: (!weight || !reps) ? 0.4 : 1,
+        boxShadow: saved || saving || !weight || !reps ? 'none' : '0 4px 16px rgba(200,255,0,0.3)'
+      }}>
+        {saved ? '✓ Guardada' : saving ? 'Guardando...' : 'Registrar Serie ' + setNumber}
+      </button>
+    </div>
+  )
+}
+
+export function CompletedSet({ set, exerciseIndex, setIndex, sessionId }: { set: any; exerciseIndex: number; setIndex: number; sessionId: string }) {
+  const { removeSet } = useSessionStore()
+  const [del, setDel] = useState(false)
+  const typeColors: Record<string, string> = { working: '#C8FF00', warmup: '#FBBF24', top_set: '#A78BFA', backoff: '#60A5FA' }
+  const col = typeColors[set.set_type] ?? '#C8FF00'
+
+  const handleDel = async () => {
+    if (!set.id || del) return
+    if (!confirm('Borrar esta serie?')) return
+    setDel(true)
+    try {
+      await fetch('/api/sessions/' + sessionId + '/sets', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setId: set.id })
+      })
+      removeSet(exerciseIndex, setIndex)
+    } catch {}
+    setDel(false)
   }
 
   return (
     <div style={{
-      background: '#111118',
-      border: '1px solid #222',
-      borderRadius: '16px',
-      padding: '20px',
-      marginBottom: '12px',
+      background: '#0d0d14', border: '1px solid ' + col + '22',
+      borderRadius: 12, padding: '12px 16px', marginBottom: 6,
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center'
     }}>
-      <style>{`
-        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
-        .bounce-in { animation: bounceIn 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
-      `}</style>
-      <div style={{
-        color: '#C8FF00',
-        fontSize: '13px',
-        fontWeight: '700',
-        fontFamily: 'Syne, sans-serif',
-        marginBottom: '16px',
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-      }}>
-        Serie {setNumber}
-      </div>
-
-      {lastSet && (
-        <div style={{ textAlign: 'center', color: '#555', fontSize: '12px', fontFamily: 'DM Mono, monospace', marginBottom: '12px' }}>
-          Última vez: {lastSet.weight_kg}kg × {lastSet.reps_completed}
-          {lastSet.rir_actual !== null && ` · RIR ${lastSet.rir_actual}`}
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-        <div>
-          <div style={labelStyle}>KG</div>
-          <input
-            type="number"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            placeholder="0"
-            style={inputStyle}
-            inputMode="decimal"
-          />
-        </div>
-        <div>
-          <div style={labelStyle}>Reps</div>
-          <input
-            type="number"
-            value={reps}
-            onChange={(e) => setReps(e.target.value)}
-            placeholder="0"
-            style={inputStyle}
-            inputMode="numeric"
-          />
-        </div>
-        <div>
-          <div style={labelStyle}>RIR</div>
-          <input
-            type="number"
-            value={rir}
-            onChange={(e) => setRir(e.target.value)}
-            placeholder="2"
-            style={inputStyle}
-            inputMode="numeric"
-          />
-        </div>
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        <button
-          onClick={handleLog}
-          disabled={saving || !weight || !reps}
-          style={{
-            background: saved ? '#22c55e' : saving ? '#333' : '#C8FF00',
-            color: '#0A0A0F',
-            border: 'none',
-            borderRadius: '10px',
-            padding: '14px',
-            fontSize: '15px',
-            fontWeight: '700',
-            fontFamily: 'Syne, sans-serif',
-            cursor: (saving || !weight || !reps) ? 'not-allowed' : 'pointer',
-            width: '100%',
-            transition: 'background 0.2s',
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {saved ? 'Serie guardada' : saving ? 'Guardando...' : 'Registrar Serie'}
-        </button>
-        {saved && (
-          <div className="bounce-in" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#22c55e', borderRadius: '10px' }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0A0A0F" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          </div>
-        )}
-      </div>
+      <span style={{ color: col, fontSize: 11, fontWeight: 700, fontFamily: 'Syne, sans-serif', minWidth: 28 }}>S{set.set_number}</span>
+      <span style={{ color: '#F0F0F5', fontSize: 20, fontWeight: 700, fontFamily: 'DM Mono, monospace', flex: 1, textAlign: 'center' }}>
+        {set.weight_kg}kg × {set.reps_completed}
+      </span>
+      <span style={{ color: '#44445a', fontSize: 11, fontFamily: 'DM Mono, monospace', minWidth: 48, textAlign: 'right' }}>
+        {set.rir_actual !== null ? 'RIR ' + set.rir_actual : ''}
+      </span>
+      <button onClick={handleDel} disabled={del} style={{
+        background: 'none', border: 'none', color: '#2a2a3e',
+        cursor: 'pointer', fontSize: 18, padding: '0 0 0 12px', transition: 'color 0.15s'
+      }}
+        onMouseEnter={e => (e.currentTarget.style.color = '#FF6B6B')}
+        onMouseLeave={e => (e.currentTarget.style.color = '#2a2a3e')}>×</button>
     </div>
   )
 }

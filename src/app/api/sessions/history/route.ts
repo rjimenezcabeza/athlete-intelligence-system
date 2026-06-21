@@ -1,49 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function GET(req: NextRequest) {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cs) {
-          cs.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-        },
-      },
-    }
-  )
+const getUrl = () => (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
+const getSvc = () => (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+async function getUser() {
+  const store = await cookies()
+  const supa = createServerClient(getUrl(), getSvc(), {
+    cookies: { getAll() { return store.getAll() }, setAll() {} }
+  })
+  const { data: { user } } = await supa.auth.getUser()
+  return user
+}
 
-  const { searchParams } = new URL(req.url)
-  const exerciseId = searchParams.get('exerciseId')
-  if (!exerciseId) return NextResponse.json({ sets: [] })
-
-  const { data: profile } = await (supabase as any)
-    .from('athlete_profiles').select('id').eq('user_id', user.id).single()
-
-  if (!profile) return NextResponse.json({ sets: [] })
-
-  // Últimas series de trabajo de este ejercicio para este atleta
-  const { data: sets } = await (supabase as any)
-    .from('sets')
-    .select(`
-      weight_kg, reps_completed, rir_actual, set_type, logged_at,
-      session_exercises!inner (
-        exercise_id,
-        training_sessions!inner ( athlete_id, session_date )
-      )
-    `)
-    .eq('session_exercises.exercise_id', exerciseId)
-    .eq('session_exercises.training_sessions.athlete_id', profile.id)
-    .eq('set_type', 'working')
-    .order('logged_at', { ascending: false })
-    .limit(20)
-
-  return NextResponse.json({ sets: sets ?? [] })
+export async function GET() {
+  try {
+    const user = await getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const admin = createClient(getUrl(), getSvc(), { auth: { autoRefreshToken: false, persistSession: false } })
+    const { data: profile } = await (admin as any).from('athlete_profiles').select('id').eq('user_id', user.id).single()
+    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    const { data } = await (admin as any)
+      .from('training_sessions')
+      .select('id, session_date, duration_minutes, pump_rating, local_fatigue, perceived_recovery, status')
+      .eq('athlete_id', profile.id)
+      .order('session_date', { ascending: false })
+      .limit(50)
+    return NextResponse.json({ sessions: data ?? [] })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }

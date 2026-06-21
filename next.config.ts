@@ -5,8 +5,11 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/config.ts')
 
 const nextConfig: NextConfig = {
   experimental: {
-    serverActions: { allowedOrigins: ['localhost:3000'] },
+    serverActions: {
+      allowedOrigins: ['localhost:3000', 'athlete-intelligence-system.vercel.app'],
+    },
   },
+  serverExternalPackages: ['@anthropic-ai/sdk'],
   images: {
     remotePatterns: [{ protocol: 'https', hostname: '*.supabase.co' }],
   },

@@ -1,36 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-async function createDb() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cs) => cs.forEach(({ name, value, options }) =>
-          cookieStore.set(name, value, options)
-        )
-      }
-    }
-  )
+const getUrl = () => (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
+const getSvc = () => (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+
+async function getUser() {
+  const store = await cookies()
+  const supa = createServerClient(getUrl(), getSvc(), {
+    cookies: { getAll() { return store.getAll() }, setAll() {} }
+  })
+  const { data: { user } } = await supa.auth.getUser()
+  return user
+}
+
+function db() {
+  return createClient(getUrl(), getSvc(), { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createDb()
-    const { data: { user } } = await (supabase as any).auth.getUser()
+    const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { display_name, training_experience_years, primary_goal, body_weight_kg, weight_unit, language } = await req.json()
-
     if (!display_name || display_name.trim().length < 2) {
-      return NextResponse.json({ error: 'display_name required' }, { status: 400 })
+      return NextResponse.json({ error: 'display_name required (min 2 chars)' }, { status: 400 })
     }
 
-    const { data, error } = await (supabase as any)
+    const admin = db()
+    const { data, error } = await (admin as any)
       .from('athlete_profiles')
       .upsert({
         user_id: user.id,
@@ -42,12 +42,12 @@ export async function POST(req: NextRequest) {
         language: language ?? 'es',
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' })
-      .select()
-      .single()
+      .select().single()
 
     if (error) throw error
     return NextResponse.json({ success: true, profile: data })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

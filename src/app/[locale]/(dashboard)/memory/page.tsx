@@ -1,120 +1,201 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { PatternCard } from '@/components/memory/PatternCard'
-import { ExerciseHistoryCard } from '@/components/memory/ExerciseHistoryCard'
+'use client'
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import Link from 'next/link'
 
-export default async function MemoryPage({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = await params
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
+
+const MC: Record<string, string> = {
+  chest: '#FF6B6B', back: '#4ECDC4', shoulders: '#A78BFA', arms: '#FBBF24',
+  legs: '#60A5FA', core: '#F97316', glutes: '#EC4899', calves: '#10B981'
+}
+const mc = (m: string) => MC[m?.toLowerCase()] ?? ACC
+
+const SEV: Record<string, string> = {
+  info: '#60A5FA', warning: '#FBBF24', success: '#C8FF00', danger: '#FF6B6B'
+}
+
+function Skel({ h = 80 }: { h?: number }) {
+  return <div style={{ height: h, borderRadius: 14, background: 'linear-gradient(90deg,#16161f 25%,#1e1e2e 50%,#16161f 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+}
+
+export default function MemoryPage() {
+  const params = useParams()
+  const locale = (params?.locale as string) ?? 'es'
+  const isEs = locale === 'es'
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/memory/summary')
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const animStyle = (delay: number): React.CSSProperties => ({
+    animation: `fadeInUp 0.3s ease-out ${delay}ms both`,
+  })
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: BG, padding: '40px 20px', paddingBottom: 96 }}>
+      <style>{`@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}`}</style>
+      <Skel h={36} />
+      <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {[1,2,3,4].map(i => <Skel key={i} h={80} />)}
+      </div>
+    </div>
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect(`/${locale}/login`)
+  if (!data || data.error) return (
+    <div style={{ minHeight: '100vh', background: BG, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 36, marginBottom: 12 }}>🧠</p>
+        <p style={{ fontSize: 14, color: '#FF6B6B' }}>{data?.error ?? (isEs ? 'Error cargando' : 'Loading error')}</p>
+      </div>
+    </div>
+  )
 
-  const { data: profile } = await (supabase as any)
-    .from('athlete_profiles')
-    .select('id, display_name, language, subscription_tier')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) redirect(`/${locale}/onboarding`)
-
-  const lang = profile.language || locale
-
-  // Obtener patrones activos
-  const { data: patterns } = await (supabase as any)
-    .from('athlete_patterns')
-    .select('*, exercises(id, name, slug)')
-    .eq('athlete_id', profile.id)
-    .eq('is_active', true)
-    .eq('is_dismissed', false)
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  // Obtener historial top ejercicios
-  const { data: exerciseHistory } = await (supabase as any)
-    .from('exercise_history')
-    .select('*, exercises(name, slug, muscle_group_primary, equipment)')
-    .eq('athlete_id', profile.id)
-    .order('total_sessions', { ascending: false })
-    .limit(6)
-
-  // Stats globales
-  const { data: stats } = await (supabase as any)
-    .from('training_sessions')
-    .select('id', { count: 'exact' })
-    .eq('athlete_id', profile.id)
-    .eq('status', 'completed')
-
-  const totalSessions = stats?.length || 0
-
-  const t = {
-    title: lang === 'en' ? 'Athlete Memory' : 'Memoria del Atleta',
-    subtitle: lang === 'en' ? 'Your training patterns and history' : 'Tus patrones y historial de entrenamiento',
-    sessions: lang === 'en' ? 'Sessions' : 'Sesiones',
-    patterns_title: lang === 'en' ? 'Active Insights' : 'Insights Activos',
-    history_title: lang === 'en' ? 'Exercise History' : 'Historial de Ejercicios',
-    no_patterns: lang === 'en' ? 'No active insights. Keep training!' : '¡Sin insights activos. Sigue entrenando!',
-    no_history: lang === 'en' ? 'No history yet. Log your first session!' : 'Sin historial aún. ¡Registra tu primera sesión!',
-  }
+  const { patterns, personalRecords, volumeByMuscle, recommendations, totalSessions } = data
+  const maxVol = volumeByMuscle.length > 0 ? volumeByMuscle[0].volume || 1 : 1
+  const hasData = patterns.length > 0 || personalRecords.length > 0 || recommendations.length > 0
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] pb-24">
-      {/* Header */}
-      <div className="px-4 pt-6 pb-4">
-        <div className="flex items-center justify-between mb-1">
-          <h1 className="text-xl font-bold text-white" style={{ fontFamily: 'Syne, sans-serif' }}>
-            {t.title}
+    <div style={{ minHeight: '100vh', background: BG, color: T1, paddingBottom: 96 }}>
+      <style>{`@keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+      {/* HEADER */}
+      <div style={{ padding: '40px 20px 20px', ...animStyle(0) }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 30, fontWeight: 700, color: T1, letterSpacing: '-0.02em' }}>
+            {isEs ? 'Memoria' : 'Memory'}
           </h1>
-          <div className="flex items-center gap-1.5 bg-white/5 rounded-full px-3 py-1">
-            <span className="text-[#C8FF00] font-bold text-sm font-mono">{totalSessions}</span>
-            <span className="text-white/40 text-xs">{t.sessions}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(200,255,0,0.08)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: 100, padding: '6px 14px' }}>
+            <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 14, color: ACC }}>{totalSessions}</span>
+            <span style={{ fontSize: 11, color: T2 }}>{isEs ? 'sesiones' : 'sessions'}</span>
           </div>
         </div>
-        <p className="text-white/40 text-sm">{t.subtitle}</p>
+        <p style={{ fontSize: 13, color: T2 }}>{isEs ? 'Tu cerebro de entrenamiento' : 'Your training brain'}</p>
       </div>
 
-      <div className="px-4 space-y-6">
-        {/* Insights / Patrones */}
-        <section>
-          <h2 className="text-sm font-semibold text-white/60 uppercase tracking-widest mb-3 font-mono">
-            {t.patterns_title}
-          </h2>
-          {patterns && patterns.length > 0 ? (
-            <div className="space-y-3">
-              {patterns.map((p: any) => (
-                <PatternCard key={p.id} pattern={p} language={lang} />
-              ))}
+      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* PATRONES */}
+        <section style={animStyle(80)}>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 10 }}>
+            {isEs ? 'Patrones detectados' : 'Detected patterns'}
+          </p>
+          {patterns.length === 0 ? (
+            <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 16, padding: '28px 20px', textAlign: 'center' }}>
+              <p style={{ fontSize: 24, marginBottom: 8 }}>🧠</p>
+              <p style={{ fontSize: 13, color: T2 }}>{isEs ? 'Sigue entrenando para detectar patrones' : 'Keep training to detect patterns'}</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/5 bg-white/[0.02] p-6 text-center">
-              <p className="text-white/30 text-sm">🧠 {t.no_patterns}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {patterns.map((p: any) => (
+                <div key={p.id} style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: SEV[p.severity] ?? ACC, flexShrink: 0, marginTop: 5 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontWeight: 700, fontSize: 13, color: T1, fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>
+                      {isEs ? p.title_es : p.title_en}
+                    </p>
+                    <p style={{ fontSize: 12, color: T2, lineHeight: 1.5 }}>
+                      {isEs ? p.description_es : p.description_en}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>
 
-        {/* Historial de ejercicios */}
-        <section>
-          <h2 className="text-sm font-semibold text-white/60 uppercase tracking-widest mb-3 font-mono">
-            {t.history_title}
-          </h2>
-          {exerciseHistory && exerciseHistory.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3">
-              {exerciseHistory.map((h: any) => (
-                <ExerciseHistoryCard key={h.id} history={h} language={lang} />
-              ))}
+        {/* RECORDS PERSONALES */}
+        <section style={animStyle(120)}>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 10 }}>
+            {isEs ? 'Records personales' : 'Personal records'}
+          </p>
+          {personalRecords.length === 0 ? (
+            <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 16, padding: '28px 20px', textAlign: 'center' }}>
+              <p style={{ fontSize: 24, marginBottom: 8 }}>🏆</p>
+              <p style={{ fontSize: 13, color: T2 }}>{isEs ? 'Completa sesiones para ver tus records' : 'Complete sessions to see your records'}</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/5 bg-white/[0.02] p-6 text-center">
-              <p className="text-white/30 text-sm">📊 {t.no_history}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {personalRecords.map((r: any, i: number) => (
+                <div key={i} style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 14, padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: mc(r.muscle) + '20', color: mc(r.muscle), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, fontFamily: 'DM Mono, monospace', flexShrink: 0 }}>
+                    #{i + 1}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 700, fontSize: 13, color: T1, fontFamily: 'Syne, sans-serif', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</p>
+                    <p style={{ fontSize: 11, color: mc(r.muscle), textTransform: 'capitalize' }}>{r.muscle}</p>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <p style={{ fontWeight: 700, fontSize: 18, color: ACC, fontFamily: 'DM Mono, monospace' }}>{r.maxWeight}kg</p>
+                    <p style={{ fontSize: 10, color: T3 }}>{r.sessions} {isEs ? 'ses.' : 'sess.'}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>
+
+        {/* VOLUMEN POR MÚSCULO */}
+        {volumeByMuscle.length > 0 && (
+          <section style={animStyle(160)}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 10 }}>
+              {isEs ? 'Volumen por músculo (4 sem.)' : 'Volume by muscle (4 wks)'}
+            </p>
+            <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 16, padding: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {volumeByMuscle.map((v: any) => (
+                  <div key={v.muscle}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: mc(v.muscle), fontFamily: 'Syne, sans-serif', textTransform: 'capitalize', letterSpacing: '0.06em' }}>{v.muscle}</span>
+                      <span style={{ fontSize: 11, color: T2, fontFamily: 'DM Mono, monospace' }}>{v.volume.toLocaleString()}kg</span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 3, background: '#1a1a2e', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 3, background: mc(v.muscle) + 'BB', width: Math.round(v.volume / maxVol * 100) + '%', transition: 'width 0.7s ease' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* RECOMENDACIONES IA */}
+        {recommendations.length > 0 && (
+          <section style={animStyle(200)}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 10 }}>
+              {isEs ? 'Recomendaciones IA' : 'AI Recommendations'}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {recommendations.map((r: any) => (
+                <div key={r.id} style={{ background: CARD, border: '1px solid rgba(200,255,0,0.08)', borderRadius: 14, padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: ACC, flexShrink: 0, marginTop: 6 }} />
+                  <p style={{ fontSize: 13, color: T1, lineHeight: 1.5, fontFamily: 'Inter, sans-serif' }}>{r.recommendation_text}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* EMPTY STATE */}
+        {!hasData && (
+          <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '48px 20px', textAlign: 'center', ...animStyle(120) }}>
+            <p style={{ fontSize: 40, marginBottom: 16 }}>🧬</p>
+            <p style={{ fontWeight: 700, fontSize: 18, color: T1, fontFamily: 'Syne, sans-serif', marginBottom: 8 }}>
+              {isEs ? 'Sin datos aún' : 'No data yet'}
+            </p>
+            <p style={{ fontSize: 13, color: T2, marginBottom: 24 }}>
+              {isEs ? 'Completa entrenamientos para ver tu memoria atlética' : 'Complete workouts to see your athlete memory'}
+            </p>
+            <Link href={`/${locale}/session/new`} style={{ display: 'inline-block', background: 'rgba(200,255,0,0.1)', color: ACC, border: '1px solid rgba(200,255,0,0.2)', borderRadius: 12, padding: '12px 28px', fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 700 }}>
+              {isEs ? 'Empezar a entrenar' : 'Start training'}
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )

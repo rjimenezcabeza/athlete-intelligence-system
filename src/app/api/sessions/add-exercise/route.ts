@@ -1,21 +1,26 @@
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
 
-const getUrl = () => (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
-const getSvcKey = () => (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+function adminDb() {
+  return createClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 async function getUser() {
   const store = await cookies()
-  const supa = createServerClient(getUrl(), getSvcKey(), {
-    cookies: { getAll() { return store.getAll() }, setAll() {} }
-  })
+  const supa = createServerClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { cookies: { getAll() { return store.getAll() }, setAll() {} } }
+  )
   const { data: { user } } = await supa.auth.getUser()
   return user
 }
-
-function db() { return createClient(getUrl(), getSvcKey()) }
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,42 +29,55 @@ export async function POST(req: NextRequest) {
 
     const { sessionId, exerciseId } = await req.json()
     if (!sessionId || !exerciseId) {
-      return NextResponse.json({ error: 'sessionId and exerciseId required' }, { status: 400 })
+      return NextResponse.json({ error: 'sessionId y exerciseId requeridos' }, { status: 400 })
     }
 
-    const admin = db()
+    const admin = adminDb()
 
-    // Verify session belongs to user's athlete profile
+    // Verificar que la sesion pertenece al usuario
     const { data: profile } = await (admin as any)
       .from('athlete_profiles').select('id').eq('user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
     const { data: session } = await (admin as any)
-      .from('training_sessions').select('id').eq('id', sessionId).eq('athlete_id', profile.id).single()
+      .from('training_sessions')
+      .select('id').eq('id', sessionId).eq('athlete_id', profile.id).single()
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
-    // Get exercise data
+    // Obtener datos del ejercicio
     const { data: exercise } = await (admin as any)
-      .from('exercises').select('id, name, name_en, muscle_group_primary, slug').eq('id', exerciseId).single()
+      .from('exercises')
+      .select('id, name, muscle_group_primary, slug')
+      .eq('id', exerciseId).single()
     if (!exercise) return NextResponse.json({ error: 'Exercise not found' }, { status: 404 })
 
-    // Get next order_index
-    const { data: existing } = await (admin as any)
-      .from('session_exercises').select('order_index').eq('session_id', sessionId).order('order_index', { ascending: false }).limit(1)
-    const nextIndex = existing && existing.length > 0 ? (existing[0].order_index ?? 0) + 1 : 1
-
-    // Insert session_exercise
-    const { data: sessionExercise, error } = await (admin as any)
+    // Obtener orden actual
+    const { count } = await (admin as any)
       .from('session_exercises')
-      .insert({ session_id: sessionId, exercise_id: exerciseId, order_index: nextIndex })
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', sessionId)
+
+    const { data: sessionExercise, error: seError } = await (admin as any)
+      .from('session_exercises')
+      .insert({
+        session_id: sessionId,
+        exercise_id: exerciseId,
+        order_in_session: (count ?? 0) + 1
+      })
       .select('id').single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (seError) throw seError
 
     return NextResponse.json({
-      session_exercise_id: sessionExercise.id,
-      exercise
-    }, { status: 201 })
+      sessionExercise: {
+        id: sessionExercise.id,
+        exerciseId: exercise.id,
+        name: exercise.name,
+        muscle_group_primary: exercise.muscle_group_primary,
+        slug: exercise.slug,
+        order_in_session: (count ?? 0) + 1
+      }
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: msg }, { status: 500 })

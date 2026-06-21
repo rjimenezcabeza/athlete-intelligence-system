@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-async function createDb() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cs) => cs.forEach(({ name, value, options }) =>
-          cookieStore.set(name, value, options)
-        )
-      }
-    }
+function adminDb() {
+  return createClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { auth: { autoRefreshToken: false, persistSession: false } }
   )
+}
+
+async function getUser() {
+  const store = await cookies()
+  const supa = createServerClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { cookies: { getAll() { return store.getAll() }, setAll() {} } }
+  )
+  const { data: { user } } = await supa.auth.getUser()
+  return user
 }
 
 const ALLOWED_TYPES: Record<string, string> = {
@@ -29,30 +33,26 @@ const ALLOWED_TYPES: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createDb()
-    const { data: { user } } = await (supabase as any).auth.getUser()
+    const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await (supabase as any)
+    const admin = adminDb()
+    const { data: profile } = await (admin as any)
       .from('athlete_profiles').select('id, subscription_tier').eq('user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-    // Limite free tier: 3 importaciones por mes
     if (profile.subscription_tier === 'free') {
       const startOfMonth = new Date()
-      startOfMonth.setDate(1)
-      startOfMonth.setHours(0, 0, 0, 0)
-
-      const { count } = await (supabase as any)
+      startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0)
+      const { count } = await (admin as any)
         .from('imported_files')
         .select('*', { count: 'exact', head: true })
         .eq('athlete_id', profile.id)
         .gte('uploaded_at', startOfMonth.toISOString())
-
       if ((count ?? 0) >= 3) {
         return NextResponse.json({
           error: 'LIMIT_REACHED',
-          message: 'Free plan: 3 imports/month. Upgrade to Pro for unlimited.',
+          message: 'Plan gratuito: 3 importaciones/mes. Actualiza a Pro.',
           upgrade_url: '/upgrade'
         }, { status: 403 })
       }
@@ -63,19 +63,26 @@ export async function POST(req: NextRequest) {
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
     const fileType = ALLOWED_TYPES[file.type]
-    if (!fileType) return NextResponse.json({ error: 'File type not supported' }, { status: 400 })
-    if (file.size > 52428800) return NextResponse.json({ error: 'File too large (max 50MB)' }, { status: 400 })
+    if (!fileType) return NextResponse.json({ error: 'Tipo de archivo no soportado' }, { status: 400 })
+
+    // Si el archivo supera 4MB avisa al cliente para que use signed URL
+    if (file.size > 4 * 1024 * 1024) {
+      return NextResponse.json({
+        error: 'FILE_TOO_LARGE_FOR_PROXY',
+        useDirectUpload: true
+      }, { status: 413 })
+    }
 
     const ext = file.name.split('.').pop() ?? 'bin'
     const storagePath = `${user.id}/${Date.now()}.${ext}`
     const bytes = await file.arrayBuffer()
 
-    const { error: storageError } = await (supabase as any).storage
+    const { error: storageError } = await (admin as any).storage
       .from('imports')
       .upload(storagePath, bytes, { contentType: file.type, upsert: false })
     if (storageError) throw storageError
 
-    const { data: importRecord, error: dbError } = await (supabase as any)
+    const { data: importRecord, error: dbError } = await (admin as any)
       .from('imported_files')
       .insert({
         athlete_id: profile.id,
@@ -85,11 +92,12 @@ export async function POST(req: NextRequest) {
         file_size_bytes: file.size,
         import_status: 'pending'
       })
-      .select().single()
+      .select('id').single()
     if (dbError) throw dbError
 
     return NextResponse.json({ success: true, importId: importRecord.id, fileType })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

@@ -1,165 +1,148 @@
 'use client'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { useDashboardSummary } from '@/hooks/useDashboardSummary'
-import PatternCard from '@/components/dashboard/PatternCard'
-import RecentSessionsList from '@/components/dashboard/RecentSessionsList'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
-export default function DashboardPage({ params }: { params: Promise<{ locale: string }> }) {
+const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
+
+function Skel({ w = '100%', h = 32 }: { w?: string | number; h?: number }) {
+  return <div className="skeleton" style={{ width: w, height: h, borderRadius: 10, flexShrink: 0 }} />
+}
+
+export default function DashboardPage() {
+  const params = useParams()
   const router = useRouter()
-  const [locale, setLocale] = useState<string>('es')
+  const locale = (params?.locale as string) ?? 'es'
+  const isEs = locale === 'es'
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    params.then(p => setLocale(p.locale ?? 'es'))
-  }, [params])
+    fetch('/api/dashboard/summary')
+      .then(r => { if (r.status === 401) { router.push('/' + locale + '/login'); return null } return r.json() })
+      .then(d => { if (d) { setData(d); setLoading(false) } })
+      .catch(() => setLoading(false))
+  }, [])
 
-  const isEs = locale === 'es'
-  const { data, loading, error } = useDashboardSummary()
+  const kpis = [
+    { label: isEs ? 'RACHA' : 'STREAK', value: data?.stats?.streak ?? 0, unit: 'd', sub: isEs ? 'dias seguidos' : 'consecutive', accent: (data?.stats?.streak ?? 0) >= 3 },
+    { label: isEs ? 'SESIONES' : 'SESSIONS', value: data?.stats?.totalSessions ?? 0, unit: '', sub: isEs ? 'completadas' : 'completed', accent: false },
+    { label: isEs ? 'MEDIA' : 'AVG', value: data?.stats?.avgDuration ?? null, unit: 'min', sub: isEs ? 'por sesion' : 'per session', accent: false },
+    { label: 'PLAN', value: data?.profile?.subscription_tier === 'pro' ? 'Pro' : 'Free', unit: '', sub: '', accent: data?.profile?.subscription_tier === 'pro' },
+  ]
 
-  if (loading) return (
-    <div className="min-h-screen pb-24 px-4 pt-8" style={{ background: '#0A0A0F' }}>
-      <style>{'.skeleton { background: linear-gradient(90deg, #16161f 25%, #1e1e2e 50%, #16161f 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; } @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }'}</style>
-      {/* Header skeleton */}
-      <div className="h-4 w-32 rounded-full skeleton mb-2" />
-      <div className="h-8 w-48 rounded-xl skeleton mb-6" />
-      {/* Hero skeleton */}
-      <div className="h-36 w-full rounded-2xl skeleton mb-4" />
-      {/* Cards grid skeleton */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-2xl skeleton" />)}
-      </div>
-      {/* Button skeleton */}
-      <div className="h-14 w-full rounded-2xl skeleton mb-4" />
-      {/* Chart skeleton */}
-      <div className="h-40 w-full rounded-2xl skeleton" />
-    </div>
-  )
-
-  if (error || !data) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0A0F' }}>
-      <div className="text-center">
-        <p className="text-sm mb-4" style={{ color: '#FF6B6B' }}>{error ?? 'Error cargando datos'}</p>
-        <button onClick={() => router.push(`/${locale}/login`)} className="text-sm px-4 py-2 rounded-xl"
-          style={{ background: '#C8FF00', color: '#0A0A0F' }}>
-          {isEs ? 'Iniciar sesion' : 'Log in'}
-        </button>
-      </div>
-    </div>
-  )
-
-  const { profile, stats, weeklyChart, patterns, progressions, recommendations, recentSessions } = data
+  const fb = data?.stats?.avgFeedback
+  const feedbackBars = fb ? [
+    { label: 'Pump', value: fb.pump, color: ACC },
+    { label: isEs ? 'Fatiga' : 'Fatigue', value: fb.fatigue, color: '#FF6B6B' },
+    { label: isEs ? 'Recuper.' : 'Recovery', value: fb.recovery, color: '#4ECDC4' },
+    { label: 'RIR', value: fb.rir, color: '#A78BFA' },
+  ] : null
 
   return (
-    <div className="min-h-screen pb-28" style={{ background: '#0A0A0F' }}>
-      {/* Animated skeleton style if needed */}
-      <style>{`
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        .fade-in-0 { animation: fadeInUp 0.4s ease-out 0ms both; }
-        .fade-in-1 { animation: fadeInUp 0.4s ease-out 100ms both; }
-        .fade-in-2 { animation: fadeInUp 0.4s ease-out 200ms both; }
-        .fade-in-3 { animation: fadeInUp 0.4s ease-out 300ms both; }
-        .fade-in-4 { animation: fadeInUp 0.4s ease-out 400ms both; }
-      `}</style>
+    <div style={{ minHeight: '100vh', background: BG, paddingBottom: 96 }}>
 
-      {/* HEADER */}
-      <div className="px-5 pt-10 pb-6 fade-in-0">
-        <p className="text-xs font-medium tracking-widest uppercase mb-1.5" style={{ color: '#555', fontFamily: 'Syne, sans-serif' }}>
-          {isEs ? 'Bienvenido de vuelta' : 'Welcome back'}
-        </p>
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold" style={{ color: '#F0F0F5', fontFamily: 'Syne, sans-serif' }}>
-            {profile.display_name}
-          </h1>
-          {profile.subscription_tier === 'pro' && (
-            <span className="text-xs px-3 py-1 rounded-full font-bold tracking-wider"
-              style={{ background: 'linear-gradient(135deg, #C8FF00 0%, #88DD00 100%)', color: '#0A0A0F' }}>
-              PRO
-            </span>
+      {/* Header */}
+      <div className="fade-in" style={{ padding: '28px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3, marginBottom: 6 }}>
+            {isEs ? 'BIENVENIDO DE VUELTA' : 'WELCOME BACK'}
+          </p>
+          {loading ? <Skel w={160} h={32} /> : (
+            <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 28, fontWeight: 700, color: T1, lineHeight: 1.1 }}>
+              {data?.profile?.display_name ?? 'Atleta'}
+            </h1>
           )}
         </div>
+        {!loading && data?.profile?.subscription_tier === 'pro' && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', fontFamily: 'Syne, sans-serif', background: 'rgba(200,255,0,0.15)', color: ACC, border: '1px solid rgba(200,255,0,0.3)' }}>PRO</span>
+        )}
       </div>
 
-      {/* HERO METRIC — Streak */}
-      <div className="mx-4 mb-4 rounded-2xl p-6 fade-in-1 overflow-hidden relative"
-        style={{ background: 'linear-gradient(135deg, #111820 0%, #0d150a 100%)', border: '1px solid rgba(200,255,0,0.15)', boxShadow: '0 0 40px rgba(200,255,0,0.08)' }}>
-        <div className="absolute top-0 right-0 w-40 h-40 rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(200,255,0,0.08) 0%, transparent 70%)', transform: 'translate(20%, -20%)' }} />
-        <p className="text-xs font-medium uppercase tracking-widest mb-1" style={{ color: '#C8FF0099', fontFamily: 'Syne, sans-serif' }}>
-          {isEs ? 'Racha activa' : 'Active streak'}
-        </p>
-        <div className="flex items-end gap-2">
-          <span style={{ fontSize: '80px', lineHeight: 1, fontWeight: 700, color: '#C8FF00', fontFamily: 'DM Mono, monospace', letterSpacing: '-0.02em' }}>
-            {stats.streak}
-          </span>
-          <span className="text-xl pb-3 font-medium" style={{ color: '#8888AA' }}>
-            {isEs ? (stats.streak === 1 ? 'día' : 'días') : (stats.streak === 1 ? 'day' : 'days')}
-          </span>
-        </div>
-        <p className="text-sm mt-1" style={{ color: '#8888AA' }}>
-          {stats.totalSessions} {isEs ? 'sesiones completadas' : 'sessions completed'}
-        </p>
-      </div>
+      <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      <div className="px-4 space-y-4">
-        {/* STATS GRID */}
-        <div className="grid grid-cols-2 gap-3 fade-in-1">
-          {[
-            { label: isEs ? 'Duración media' : 'Avg duration', value: stats.avgDuration > 0 ? `${stats.avgDuration}m` : '-', sub: isEs ? 'por sesión' : 'per session' },
-            { label: 'Plan', value: profile.subscription_tier === 'pro' ? 'Pro' : 'Free', sub: profile.subscription_tier === 'free' ? (isEs ? 'Actualiza' : 'Upgrade') : (isEs ? 'Activo' : 'Active'), accent: profile.subscription_tier === 'pro' },
-          ].map((card, i) => (
-            <div key={i} className="rounded-2xl p-4" style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
-              <p className="text-xs uppercase tracking-widest mb-2" style={{ color: '#8888AA', fontFamily: 'Syne, sans-serif', fontSize: '10px' }}>{card.label}</p>
-              <p className="text-2xl font-bold" style={{ color: card.accent ? '#C8FF00' : '#F0F0F5', fontFamily: 'DM Mono, monospace' }}>{card.value}</p>
-              {card.sub && <p className="text-xs mt-1" style={{ color: '#555' }}>{card.sub}</p>}
+        {/* KPI Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {kpis.map((k, i) => (
+            <div key={i} className={'fade-in s' + i} style={{
+              background: k.accent ? 'linear-gradient(135deg,rgba(200,255,0,0.1) 0%,rgba(200,255,0,0.04) 100%)' : CARD,
+              border: '1px solid ' + (k.accent ? 'rgba(200,255,0,0.2)' : BORDER),
+              borderRadius: 18, padding: '18px 16px'
+            }}>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3, marginBottom: 10 }}>{k.label}</p>
+              {loading ? <Skel h={36} /> : (
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 34, fontWeight: 700, lineHeight: 1, color: k.accent ? ACC : T1 }}>
+                  {k.value === null ? '—' : k.value}
+                  {k.unit && k.value !== null && <span style={{ fontSize: 16, color: T2, marginLeft: 4 }}>{k.unit}</span>}
+                </p>
+              )}
+              {k.sub && <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: T3, marginTop: 4 }}>{k.sub}</p>}
             </div>
           ))}
         </div>
 
-        {/* CTA BUTTON */}
-        <Link href={`/${locale}/session/new`}
-          className="block w-full py-4 rounded-2xl text-center font-bold text-lg active:scale-98 transition-transform fade-in-2"
-          style={{ background: 'linear-gradient(135deg, #C8FF00 0%, #88DD00 100%)', color: '#0A0A0F', fontFamily: 'Syne, sans-serif', boxShadow: '0 0 32px rgba(200,255,0,0.25)' }}>
-          {isEs ? '⚡ Entrenar ahora' : '⚡ Train now'}
+        {/* CTA Entrenar */}
+        <Link href={'/' + locale + '/session/new'} className="fade-in s2" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          background: 'linear-gradient(135deg,#C8FF00 0%,#88DD00 100%)',
+          color: BG, borderRadius: 18, padding: '20px',
+          fontFamily: 'Syne, sans-serif', fontSize: 17, fontWeight: 800,
+          letterSpacing: '0.03em', boxShadow: '0 4px 24px rgba(200,255,0,0.3)'
+        }}>
+          <span style={{ fontSize: 22 }}>+</span>
+          {isEs ? 'Entrenar ahora' : 'Train now'}
         </Link>
 
-        {/* VOLUME CHART */}
-        {weeklyChart.length > 0 && (
-          <div className="rounded-2xl p-4 fade-in-2" style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <p className="text-xs uppercase tracking-widest mb-4" style={{ color: '#8888AA', fontFamily: 'Syne, sans-serif', fontSize: '10px' }}>
-              {isEs ? 'Volumen semanal' : 'Weekly volume'}
+        {/* Recharts AreaChart — Volumen Semanal */}
+        {!loading && data?.weeklyChart?.length > 1 && (
+          <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '18px 16px' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3, marginBottom: 14 }}>
+              {isEs ? 'VOLUMEN SEMANAL (kg)' : 'WEEKLY VOLUME (kg)'}
             </p>
-            <ResponsiveContainer width="100%" height={120}>
-              <AreaChart data={weeklyChart} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={100}>
+              <AreaChart data={data.weeklyChart} margin={{ top: 4, right: 4, left: -32, bottom: 0 }}>
                 <defs>
                   <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#C8FF00" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#C8FF00" stopOpacity={0} />
+                    <stop offset="5%" stopColor={ACC} stopOpacity={0.25} />
+                    <stop offset="95%" stopColor={ACC} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="week" tick={{ fill: '#444', fontSize: 9 }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip contentStyle={{ background: '#16161f', border: '1px solid rgba(200,255,0,0.2)', borderRadius: '8px', color: '#F0F0F5', fontSize: '12px' }}
-                  formatter={(v: any) => [`${v}kg`, isEs ? 'Volumen' : 'Volume']} />
-                <Area type="monotone" dataKey="volume" stroke="#C8FF00" strokeWidth={2} fill="url(#volGrad)" dot={false} activeDot={{ r: 4, fill: '#C8FF00' }} />
+                <XAxis dataKey="week" tick={{ fill: T3, fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis hide domain={['auto', 'auto']} />
+                <Tooltip
+                  contentStyle={{ background: '#16161f', border: '1px solid rgba(200,255,0,0.2)', borderRadius: 10, color: T1, fontSize: 12 }}
+                  formatter={(v: unknown) => [`${v} kg`, isEs ? 'Volumen' : 'Volume']}
+                />
+                <Area type="monotone" dataKey="volume" stroke={ACC} strokeWidth={2} fill="url(#volGrad)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {/* AI COACH */}
-        {recommendations.length > 0 && (
-          <div className="fade-in-3">
-            <p className="text-xs uppercase tracking-widest mb-3" style={{ color: '#8888AA', fontFamily: 'Syne, sans-serif', fontSize: '10px' }}>AI Coach</p>
-            <div className="space-y-2">
-              {recommendations.map(r => (
-                <div key={r.id} className="rounded-2xl p-4" style={{ background: '#0d150a', border: '1px solid rgba(200,255,0,0.12)' }}>
-                  <div className="flex items-start gap-3">
-                    <span style={{ fontSize: '20px' }}>
-                      {r.recommendation_type === 'recovery_warning' ? '⚠️' : r.recommendation_type === 'progression_opportunity' ? '📈' : r.recommendation_type === 'volume_adjustment' ? '💪' : '🤖'}
-                    </span>
-                    <p className="text-sm flex-1" style={{ color: '#ddd', lineHeight: 1.5 }}>{r.recommendation_text}</p>
+        {/* Empty state chart */}
+        {!loading && (!data?.weeklyChart || data.weeklyChart.length === 0) && (
+          <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '28px 20px', textAlign: 'center' }}>
+            <p style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}>📊</p>
+            <p style={{ fontSize: 13, color: T3 }}>{isEs ? 'Completa sesiones para ver el gráfico de volumen' : 'Complete sessions to see the volume chart'}</p>
+          </div>
+        )}
+
+        {/* Feedback Promedio */}
+        {!loading && feedbackBars && (
+          <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '18px 16px' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3, marginBottom: 14 }}>
+              {isEs ? 'FEEDBACK PROMEDIO (4 sesiones)' : 'AVG FEEDBACK (4 sessions)'}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {feedbackBars.map(fb => (
+                <div key={fb.label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: T3 }}>{fb.label}</span>
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: fb.color }}>{fb.value.toFixed(1)}/5</span>
+                  </div>
+                  <div style={{ height: 5, borderRadius: 3, background: '#1a1a2e', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 3, background: fb.color, width: (fb.value / 5 * 100) + '%', transition: 'width 0.6s ease' }} />
                   </div>
                 </div>
               ))}
@@ -167,46 +150,85 @@ export default function DashboardPage({ params }: { params: Promise<{ locale: st
           </div>
         )}
 
-        {/* PATTERNS */}
-        {patterns.length > 0 && (
-          <div className="fade-in-3">
-            <p className="text-xs uppercase tracking-widest mb-3" style={{ color: '#8888AA', fontFamily: 'Syne, sans-serif', fontSize: '10px' }}>
-              {isEs ? 'Patrones detectados' : 'Detected patterns'}
-            </p>
-            <div className="space-y-2">
-              {patterns.map(p => (
-                <PatternCard key={p.id} title={isEs ? p.title_es : p.title_en}
-                  description={isEs ? p.description_es : p.description_en} severity={p.severity} />
-              ))}
+        {/* AI Coach Preview */}
+        {!loading && data?.recommendations?.length > 0 && (
+          <div className="fade-in s3" style={{ background: CARD, border: '1px solid rgba(200,255,0,0.08)', borderRadius: 18, padding: '18px 16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3 }}>
+                {isEs ? 'AI COACH' : 'AI COACH'}
+              </p>
+              <Link href={'/' + locale + '/coach'} style={{ fontSize: 11, color: ACC, fontFamily: 'Syne, sans-serif' }}>
+                {isEs ? 'Ver todo →' : 'See all →'}
+              </Link>
             </div>
-          </div>
-        )}
-
-        {/* RECENT PROGRESSIONS */}
-        {progressions.length > 0 && (
-          <div className="fade-in-4">
-            <p className="text-xs uppercase tracking-widest mb-3" style={{ color: '#8888AA', fontFamily: 'Syne, sans-serif', fontSize: '10px' }}>
-              {isEs ? 'Progresiones recientes' : 'Recent progressions'}
-            </p>
-            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.05)', background: '#111118' }}>
-              {progressions.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3 px-4 py-3"
-                  style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: '#ddd' }}>{p.exercises?.name ?? 'Ejercicio'}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#555' }}>{isEs ? p.reasoning_es : p.reasoning_en}</p>
-                  </div>
-                  {p.new_weight_kg && (
-                    <span className="text-sm font-bold" style={{ color: '#C8FF00', fontFamily: 'DM Mono, monospace' }}>{p.new_weight_kg}kg</span>
-                  )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {data.recommendations.slice(0, 2).map((r: any) => (
+                <div key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: ACC, flexShrink: 0, marginTop: 5, animation: 'pulseAcc 2.5s ease-in-out infinite' }} />
+                  <p style={{ fontSize: 12, color: T2, lineHeight: 1.5, fontFamily: 'Inter, sans-serif' }}>{r.recommendation_text}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* RECENT SESSIONS */}
-        <RecentSessionsList sessions={recentSessions} locale={locale} />
+        {/* Sesiones recientes */}
+        {!loading && data?.recentSessions?.length > 0 && (
+          <div className="fade-in s3">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3 }}>
+                {isEs ? 'RECIENTES' : 'RECENT'}
+              </p>
+              <Link href={'/' + locale + '/history'} style={{ color: ACC, fontSize: 12, fontFamily: 'Syne, sans-serif' }}>
+                {isEs ? 'Ver todo →' : 'See all →'}
+              </Link>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {data.recentSessions.filter((s: any) => s.status !== 'daily_log').slice(0, 3).map((s: any) => {
+                const date = new Date(s.session_date)
+                const label = date.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+                return (
+                  <Link key={s.id} href={'/' + locale + '/history'} style={{
+                    background: CARD, border: '1px solid ' + BORDER, borderRadius: 14,
+                    padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{ color: T1, fontSize: 14, fontWeight: 500, fontFamily: 'Syne, sans-serif', textTransform: 'capitalize', marginBottom: 2 }}>{label}</p>
+                      <p style={{ color: T3, fontSize: 11 }}>{s.duration_minutes ? s.duration_minutes + 'min' : '—'}</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      {s.pump_rating != null && <span style={{ color: ACC, fontSize: 13, fontFamily: 'DM Mono, monospace' }}>{s.pump_rating}</span>}
+                      {s.local_fatigue != null && <span style={{ color: '#FF6B6B', fontSize: 13, fontFamily: 'DM Mono, monospace' }}>{s.local_fatigue}</span>}
+                      <span style={{ color: T3, fontSize: 18 }}>›</span>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && (!data?.recentSessions || data.recentSessions.filter((s: any) => s.status !== 'daily_log').length === 0) && (
+          <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '40px 20px', textAlign: 'center' }}>
+            <p style={{ fontSize: 48, marginBottom: 16, opacity: 0.2 }}>🏋️</p>
+            <p style={{ color: T1, fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 17, marginBottom: 6 }}>
+              {isEs ? 'Sin entrenamientos todavía' : 'No workouts yet'}
+            </p>
+            <p style={{ color: T3, fontSize: 13, marginBottom: 24 }}>
+              {isEs ? 'Registra tu primer entrenamiento para ver tus estadísticas' : 'Log your first workout to see your stats'}
+            </p>
+            <Link href={'/' + locale + '/session/new'} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: 'rgba(200,255,0,0.1)', color: ACC,
+              border: '1px solid rgba(200,255,0,0.2)', borderRadius: 12,
+              padding: '12px 28px', fontFamily: 'Syne, sans-serif',
+              fontSize: 14, fontWeight: 700
+            }}>
+              + {isEs ? 'Empezar' : 'Start'}
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )

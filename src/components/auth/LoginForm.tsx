@@ -8,6 +8,8 @@ export function LoginForm() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailFocus, setEmailFocus] = useState(false)
+  const [pwFocus, setPwFocus] = useState(false)
   const isEs = locale === 'es'
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -33,37 +35,90 @@ export function LoginForm() {
     }
   }
 
-  const inp: React.CSSProperties = {
-    width: '100%', background: '#111118', border: '1px solid #333',
-    borderRadius: '12px', padding: '12px 16px', color: '#fff',
-    fontSize: '15px', outline: 'none', boxSizing: 'border-box',
+  const inputStyle = (focused: boolean): React.CSSProperties => ({
+    width: '100%',
+    background: '#0d0d14',
+    border: '1.5px solid ' + (focused ? 'rgba(200,255,0,0.5)' : 'rgba(255,255,255,0.08)'),
+    borderRadius: 14,
+    color: '#F0F0F5',
+    fontFamily: 'Inter, sans-serif',
+    fontSize: 15,
+    padding: '14px 16px',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    boxSizing: 'border-box',
+  })
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    color: '#44445a',
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    fontFamily: 'Syne, sans-serif',
+    marginBottom: 8,
   }
-  const lbl: React.CSSProperties = { display: 'block', fontSize: '13px', color: '#888', marginBottom: '6px' }
 
   return (
-    <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <label style={lbl}>Email</label>
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-          placeholder="atleta@ejemplo.com" required autoComplete="email" style={inp} />
+        <label style={labelStyle}>Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="atleta@ejemplo.com"
+          required
+          autoComplete="email"
+          style={inputStyle(emailFocus)}
+          onFocus={() => setEmailFocus(true)}
+          onBlur={() => setEmailFocus(false)}
+        />
       </div>
       <div>
-        <label style={lbl}>{isEs ? 'Contrasena' : 'Password'}</label>
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-          required autoComplete="current-password" style={inp} />
+        <label style={labelStyle}>
+          {isEs ? 'Contraseña' : 'Password'}
+        </label>
+        <input
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          required
+          autoComplete="current-password"
+          style={inputStyle(pwFocus)}
+          onFocus={() => setPwFocus(true)}
+          onBlur={() => setPwFocus(false)}
+        />
       </div>
-      {error && <p style={{ color: '#FF6B6B', fontSize: '13px' }}>{error}</p>}
-      <button type="submit" disabled={loading} style={{
-        background: '#C8FF00', color: '#0A0A0F', border: 'none',
-        borderRadius: '12px', padding: '14px', fontSize: '15px',
-        fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer',
-        opacity: loading ? 0.6 : 1, width: '100%',
-      }}>
-        {loading ? (isEs ? 'Iniciando...' : 'Logging in...') : (isEs ? 'Iniciar sesion' : 'Log in')}
+      {error && (
+        <p style={{ color: '#FF6B6B', fontSize: 13, textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>{error}</p>
+      )}
+      <button
+        type="submit"
+        disabled={loading}
+        style={{
+          width: '100%',
+          background: loading ? '#1a1a2e' : 'linear-gradient(135deg,#C8FF00,#88DD00)',
+          color: loading ? '#8888AA' : '#0A0A0F',
+          border: 'none',
+          borderRadius: 14,
+          padding: '16px',
+          fontSize: 15,
+          fontWeight: 800,
+          fontFamily: 'Syne, sans-serif',
+          letterSpacing: '0.04em',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          opacity: loading ? 0.7 : 1,
+          transition: 'all 0.2s',
+          boxShadow: loading ? 'none' : '0 4px 20px rgba(200,255,0,0.3)',
+        }}
+      >
+        {loading ? (isEs ? 'Iniciando...' : 'Logging in...') : (isEs ? 'Iniciar sesión' : 'Log in')}
       </button>
-      <p style={{ textAlign: 'center', fontSize: '13px', color: '#666' }}>
-        {isEs ? 'No tienes cuenta? ' : "Don't have an account? "}
-        <a href={'/' + locale + '/register'} style={{ color: '#C8FF00', textDecoration: 'none' }}>
+      <p style={{ textAlign: 'center', fontSize: 13, color: '#44445a', fontFamily: 'Inter, sans-serif' }}>
+        {isEs ? 'Sin cuenta? ' : 'No account? '}
+        <a href={'/' + locale + '/register'} style={{ color: '#C8FF00', fontWeight: 600, textDecoration: 'none' }}>
           {isEs ? 'Registrarse' : 'Sign up'}
         </a>
       </p>

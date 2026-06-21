@@ -1,127 +1,252 @@
-import { createClient } from '@supabase/supabase-js'
-import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import Anthropic from '@anthropic-ai/sdk'
+import { inflateRawSync } from 'zlib'
 
 export const maxDuration = 60
 
-function db() {
+function adminDb() {
   return createClient(
     (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
-    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
 
-const PROMPT = `You are a fitness data extractor for the Athlete Intelligence System.
-Analyze the training data and extract structured workout information.
-Return ONLY valid JSON, no markdown, no explanation:
-{
-  "confidence": 0.0-1.0,
-  "extraction_notes": "brief description",
-  "sessions": [
-    {
-      "date": "YYYY-MM-DD or null",
-      "notes": "session notes or null",
-      "exercises": [
-        {
-          "name": "exercise name",
-          "muscle_group": "chest/back/shoulders/arms/legs/core/glutes/calves",
-          "sets": [
-            { "set_number": 1, "weight_kg": 80.0, "reps": 8, "rir": null, "set_type": "working" }
-          ]
-        }
-      ]
-    }
-  ]
+async function resolveUserId(bodyUserId: string): Promise<string | null> {
+  if (bodyUserId && bodyUserId.length > 10) return bodyUserId
+  try {
+    const store = await cookies()
+    const supa = createServerClient(
+      (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+      (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+      { cookies: { getAll() { return store.getAll() }, setAll() {} } }
+    )
+    const { data: { user } } = await supa.auth.getUser()
+    return user?.id ?? null
+  } catch (e) {
+    console.error('[resolveUserId error]', e)
+    return null
+  }
 }
-Rules:
-- Convert lbs to kg (divide by 2.205) if lbs detected
-- set_type: warmup, working, top_set, or backoff
-- If no clear training data found, set confidence below 0.3
-- Extract ALL sessions in the data`
+
+function ascii(s: string, max = 6000): string {
+  let o = ''
+  for (let i = 0; i < s.length && o.length < max; i++) {
+    const c = s.charCodeAt(i)
+    if ((c >= 32 && c <= 126) || c === 10 || c === 13 || c === 9) o += s[i]
+  }
+  return o.trim()
+}
+
+function safeParseJSON(text: string): any {
+  try { return JSON.parse(text.trim()) } catch {}
+  const s = text.indexOf('{'), e = text.lastIndexOf('}')
+  if (s !== -1 && e > s) { try { return JSON.parse(text.slice(s, e + 1)) } catch {} }
+  return { confidence: 0, extraction_notes: 'parse_error', sessions: [] }
+}
+
+function readZipEntry(buf: Buffer, filename: string): Buffer | null {
+  let pos = 0
+  while (pos < buf.length - 30) {
+    if (buf.readUInt32LE(pos) !== 0x04034b50) { pos++; continue }
+    const compression = buf.readUInt16LE(pos + 8)
+    const compressedSize = buf.readUInt32LE(pos + 18)
+    const fnLen = buf.readUInt16LE(pos + 26)
+    const extraLen = buf.readUInt16LE(pos + 28)
+    const fn = buf.slice(pos + 30, pos + 30 + fnLen).toString('utf8')
+    const dataStart = pos + 30 + fnLen + extraLen
+    const dataEnd = dataStart + compressedSize
+    if (fn === filename || fn.endsWith('/' + filename)) {
+      const data = buf.slice(dataStart, Math.min(dataEnd, buf.length))
+      try {
+        if (compression === 0) return data
+        if (compression === 8) return inflateRawSync(data)
+      } catch { return null }
+    }
+    pos = dataEnd > pos + 1 ? dataEnd : pos + 1
+  }
+  return null
+}
+
+function xlsxToText(buffer: Buffer): string {
+  const lines: string[] = []
+  try {
+    const ssXml = readZipEntry(buffer, 'xl/sharedStrings.xml')
+    const ss: string[] = []
+    if (ssXml) {
+      const xml = ssXml.toString('utf8')
+      const reSi = new RegExp('<si>[\\s\\S]*?<\\/si>', 'g')
+      const reT  = new RegExp('<t[^>]*>([^<]*)<\\/t>', 'g')
+      const blocks = xml.match(reSi) ?? []
+      for (const si of blocks) {
+        const tags = si.match(new RegExp('<t[^>]*>([^<]*)<\\/t>', 'g')) ?? []
+        ss.push(ascii(tags.map(t => t.replace(new RegExp('<[^>]+>', 'g'), '').trim()).join(' '), 150))
+      }
+    }
+    console.log('[xlsx] sharedStrings count:', ss.length)
+    const reRow  = new RegExp('<row[^>]*>[\\s\\S]*?<\\/row>', 'g')
+    const reCell = new RegExp('<c[^>]*>[\\s\\S]*?<\\/c>', 'g')
+    const reV    = new RegExp('<v>([^<]*)<\\/v>')
+    for (let n = 1; n <= 3; n++) {
+      const sheetXml = readZipEntry(buffer, 'xl/worksheets/sheet' + n + '.xml')
+      if (!sheetXml) break
+      const xml = sheetXml.toString('utf8')
+      lines.push('--- Sheet ' + n + ' ---')
+      const rows = xml.match(reRow) ?? []
+      console.log('[xlsx] sheet' + n + ' rows:', rows.length)
+      for (const row of rows.slice(0, 150)) {
+        const cells = row.match(reCell) ?? []
+        const vals: string[] = []
+        for (const cell of cells) {
+          const tM = cell.match(/t="([^"]+)"/)
+          const vM = cell.match(reV)
+          if (tM && tM[1] === 's' && vM) vals.push(ss[parseInt(vM[1], 10)] ?? '')
+          else if (vM) vals.push(ascii(vM[1], 30))
+        }
+        const line = vals.filter(Boolean).join(' | ')
+        if (line.length > 2) lines.push(line)
+      }
+    }
+  } catch (e) {
+    console.error('[xlsxToText error]', e)
+    lines.push('xlsx error: ' + ascii(String(e), 80))
+  }
+  const result = lines.join('\n').slice(0, 6000)
+  console.log('[xlsx] final text length:', result.length, 'preview:', result.slice(0, 100))
+  return result || 'No content'
+}
+
+const SCHEMA = '{"confidence":0.85,"extraction_notes":"found sessions","sessions":[{"date":"2024-01-15","day_label":"Push A","exercises":[{"name":"Press Banca","muscle_group":"chest","sets":[{"set_number":1,"weight_kg":80.0,"reps":8,"rir":2,"set_type":"working"}]}]}]}'
 
 export async function POST(req: NextRequest) {
+  let importId = ''
+  const admin = adminDb()
+
   try {
-    const { importId, userId } = await req.json()
-    if (!importId || !userId) return NextResponse.json({ error: 'importId and userId required' }, { status: 400 })
+    // Leer body con manejo de errores
+    let body: any = {}
+    try {
+      const rawBody = await req.text()
+      console.log('[process] raw body:', rawBody.slice(0, 200))
+      body = JSON.parse(rawBody)
+    } catch (parseErr) {
+      console.error('[process] body parse failed:', parseErr)
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
 
-    const supabase = db()
+    importId = String(body.importId ?? '')
+    console.log('[process] importId:', importId, 'userId:', String(body.userId ?? '').slice(0, 8))
 
-    // Verify ownership: athlete profile must belong to userId AND imported_file must belong to that athlete
-    const { data: profile } = await (supabase as any)
+    if (!importId) return NextResponse.json({ error: 'importId requerido' }, { status: 400 })
+
+    const userId = await resolveUserId(String(body.userId ?? ''))
+    console.log('[process] resolved userId:', userId?.slice(0, 8) ?? 'null')
+    if (!userId) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const { data: profile } = await (admin as any)
       .from('athlete_profiles').select('id').eq('user_id', userId).single()
-    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    console.log('[process] profile:', profile?.id?.slice(0, 8) ?? 'null')
+    if (!profile) return NextResponse.json({ error: 'Perfil no encontrado' }, { status: 404 })
 
-    const { data: importRecord } = await (supabase as any)
+    const { data: rec } = await (admin as any)
       .from('imported_files').select('*').eq('id', importId).eq('athlete_id', profile.id).single()
-    if (!importRecord) return NextResponse.json({ error: 'Import not found' }, { status: 404 })
+    console.log('[process] rec found:', !!rec, 'status:', rec?.import_status)
+    if (!rec) return NextResponse.json({ error: 'Importacion no encontrada' }, { status: 404 })
 
-    await (supabase as any).from('imported_files').update({ import_status: 'processing' }).eq('id', importId)
+    await (admin as any).from('imported_files').update({ import_status: 'processing' }).eq('id', importId)
 
-    const { data: fileData, error: dlError } = await (supabase as any).storage
-      .from('imports').download(importRecord.storage_path)
-    if (dlError) throw dlError
+    const { data: signed, error: signErr } = await (admin as any).storage
+      .from('imports').createSignedUrl(String(rec.storage_path), 120)
+    console.log('[process] signed url ok:', !!signed?.signedUrl, 'err:', signErr?.message)
+    if (!signed?.signedUrl) throw new Error('Signed URL failed: ' + (signErr?.message ?? 'unknown'))
+
+    const fetchRes = await fetch(String(signed.signedUrl))
+    console.log('[process] download status:', fetchRes.status)
+    if (!fetchRes.ok) throw new Error('Download failed: ' + fetchRes.status)
+    const buf = Buffer.from(await fetchRes.arrayBuffer())
+    console.log('[process] buffer size:', buf.length)
+
+    const storagePath = String(rec.storage_path)
+    const ext = (storagePath.split('.').pop() ?? '').toLowerCase()
+    const isImg = ['jpg','jpeg','png','webp','gif'].includes(ext)
+    const isXlsx = ['xlsx','xls','xlsm','xlsb'].includes(ext)
+    console.log('[process] fileType:', isImg ? 'image' : isXlsx ? 'excel' : 'text', 'ext:', ext)
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    let extractedData: any = null
+    let rawText = ''
 
-    if (importRecord.file_type === 'image') {
-      const bytes = await fileData.arrayBuffer()
-      const base64 = Buffer.from(bytes).toString('base64')
-      const ext = importRecord.storage_path.split('.').pop()?.toLowerCase() ?? 'jpeg'
-      const mimeMap: Record<string, string> = {
-        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/jpeg'
-      }
-      const mimeType = (mimeMap[ext] ?? 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
+    if (isImg) {
+      const mimes: Record<string,string> = { jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif' }
+      const mime = (mimes[ext] ?? 'image/jpeg') as 'image/jpeg'|'image/png'|'image/webp'|'image/gif'
+      console.log('[process] calling anthropic for image...')
+      const r = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6', max_tokens: 4096,
         messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
-          { type: 'text', text: PROMPT }
+          { type: 'image', source: { type: 'base64', media_type: mime, data: buf.toString('base64') } },
+          { type: 'text', text: 'Extract training sessions. Return ONLY valid JSON: ' + SCHEMA }
         ]}]
       })
-      const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
-      extractedData = JSON.parse(text.replace(/```json|```/g, '').trim())
+      rawText = (r.content[0] as any).text ?? '{}'
+    } else if (isXlsx) {
+      const text = xlsxToText(buf)
+      console.log('[process] calling anthropic for excel, text len:', text.length)
+      const r = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6', max_tokens: 4096,
+        messages: [{ role: 'user', content: 'Extract ALL training sessions. Return ONLY valid JSON: ' + SCHEMA + '\n\nData:\n' + text }]
+      })
+      rawText = (r.content[0] as any).text ?? '{}'
     } else {
-      let textContent = ''
-      try { textContent = await fileData.text() } catch { textContent = 'Could not extract text' }
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: PROMPT + '\n\nData:\n\n' + textContent.slice(0, 8000) }]
+      const text = ascii(buf.toString('utf8'), 6000)
+      const r = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6', max_tokens: 4096,
+        messages: [{ role: 'user', content: 'Extract training sessions. Return ONLY valid JSON: ' + SCHEMA + '\n\n' + text }]
       })
-      const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
-      extractedData = JSON.parse(text.replace(/```json|```/g, '').trim())
+      rawText = (r.content[0] as any).text ?? '{}'
     }
 
-    const confidence = extractedData?.confidence ?? 0
+    console.log('[process] anthropic response len:', rawText.length, 'preview:', rawText.slice(0, 80))
+    const extractedData = safeParseJSON(rawText)
+    const confidence = Number(extractedData?.confidence ?? 0)
+    const sessions = (extractedData?.sessions ?? []).filter((s: any) => s?.exercises?.length > 0)
+    console.log('[process] confidence:', confidence, 'sessions:', sessions.length)
 
-    if (extractedData?.sessions?.length > 0) {
-      const reviewItems = extractedData.sessions.map((session: any) => ({
-        imported_file_id: importId,
-        item_type: 'session',
-        raw_extracted: session,
-        review_status: 'pending',
-        confidence_score: confidence
-      }))
-      await (supabase as any).from('import_review_items').insert(reviewItems)
+    if (sessions.length > 0) {
+      await (admin as any).from('import_review_items').insert(
+        sessions.map((s: any) => ({
+          imported_file_id: importId, item_type: 'session',
+          raw_extracted: s, review_status: 'pending', confidence_score: confidence
+        }))
+      )
     }
 
-    const newStatus = confidence < 0.3 ? 'error' : 'review_required'
-    await (supabase as any)
-      .from('imported_files')
-      .update({
-        import_status: newStatus,
-        extracted_data: extractedData,
-        extraction_confidence: confidence,
-        extraction_notes: extractedData?.extraction_notes ?? '',
-        processed_at: new Date().toISOString()
-      })
-      .eq('id', importId)
+    const status = confidence < 0.3 ? 'error' : 'review_required'
+    // Guardar en DB (puede ser grande — no devolver al cliente)
+    await (admin as any).from('imported_files').update({
+      import_status: status,
+      extracted_data: extractedData,
+      extraction_confidence: confidence,
+      extraction_notes: ascii(String(extractedData?.extraction_notes ?? ''), 200),
+      processed_at: new Date().toISOString()
+    }).eq('id', importId)
 
-    return NextResponse.json({ success: true, confidence, sessionsFound: extractedData?.sessions?.length ?? 0, status: newStatus })
+    // Devolver solo metadatos minimos (evita FUNCTION_PAYLOAD_TOO_LARGE)
+    return NextResponse.json({
+      success: true,
+      confidence,
+      status,
+      sessionsFound: sessions.length
+    })
+
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
+    const msg = ascii(e instanceof Error ? e.message : String(e), 200)
+    console.error('[process] CATCH ERROR:', msg)
+    if (importId) {
+      await (admin as any).from('imported_files')
+        .update({ import_status: 'error', extraction_notes: msg }).eq('id', importId).catch(() => {})
+    }
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

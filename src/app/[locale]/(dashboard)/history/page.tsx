@@ -1,17 +1,33 @@
 'use client'
-
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+
+const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
 interface SessionRow {
-  id: string
-  session_date: string
-  duration_minutes: number | null
-  pump_rating: number | null
-  local_fatigue: number | null
-  perceived_recovery: number | null
-  status: string
+  id: string; session_date: string; duration_minutes: number | null
+  pump_rating: number | null; local_fatigue: number | null
+  perceived_recovery: number | null; status: string; day_label: string | null
+}
+
+type FilterPeriod = 'week' | 'month' | 'year'
+
+function buildWeeklyChart(sessions: SessionRow[]) {
+  const weeks: Record<string, number> = {}
+  sessions.forEach(s => {
+    const d = new Date(s.session_date)
+    const monday = new Date(d)
+    monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    const key = monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    weeks[key] = (weeks[key] ?? 0) + 1
+  })
+  return Object.entries(weeks).map(([week, count]) => ({ week, count })).slice(-8)
+}
+
+function Skel({ w = '100%', h = 24 }: { w?: string | number; h?: number }) {
+  return <div style={{ width: w, height: h, borderRadius: 10, background: 'linear-gradient(90deg,#16161f 25%,#1e1e2e 50%,#16161f 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite', flexShrink: 0 }} />
 }
 
 export default function HistoryPage() {
@@ -20,76 +36,227 @@ export default function HistoryPage() {
   const isEs = locale === 'es'
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<FilterPeriod>('month')
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [deleteModal, setDeleteModal] = useState<SessionRow | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
-    fetch('/api/sessions/history-list')
+    fetch('/api/sessions/history')
       .then(r => r.json())
-      .then(d => setSessions(d.sessions ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .then(d => { setSessions(d.sessions || []); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0A0F' }}>
-      <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
-        style={{ borderColor: '#C8FF00', borderTopColor: 'transparent' }} />
-    </div>
-  )
+  const doDelete = async () => {
+    if (!deleteModal || deleting) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/sessions/' + deleteModal.id, { method: 'DELETE' })
+      if (res.ok) {
+        setSessions(prev => prev.filter(s => s.id !== deleteModal.id))
+        setExpanded(null)
+        setDeleteModal(null)
+      }
+    } catch {}
+    setDeleting(false)
+  }
+
+  const now = new Date()
+  const cutoffs: Record<FilterPeriod, Date> = {
+    week:  new Date(now.getTime() - 7   * 86400000),
+    month: new Date(now.getTime() - 30  * 86400000),
+    year:  new Date(now.getTime() - 365 * 86400000),
+  }
+  const filtered = sessions.filter(s => new Date(s.session_date) >= cutoffs[filter])
+  const totalDuration = filtered.reduce((a, s) => a + (s.duration_minutes ?? 0), 0)
+  const chartData = buildWeeklyChart(sessions)
+
+  const filterLabels: Record<FilterPeriod, { es: string; en: string }> = {
+    week:  { es: '7 días',  en: '7 days'  },
+    month: { es: '30 días', en: '30 days' },
+    year:  { es: '1 año',   en: '1 year'  },
+  }
+
+  const animStyle = (delay: number): React.CSSProperties => ({
+    animation: `fadeInUp 0.3s ease-out ${delay}ms both`,
+  })
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: '#0A0A0F' }}>
-      <div className="px-4 pt-8 pb-4">
-        <h1 className="text-2xl font-bold" style={{ color: '#fff', fontFamily: 'Syne, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: BG, color: T1, paddingBottom: 96 }}>
+      <style>{`
+        @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes shimmer  { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+      `}</style>
+
+      {/* HEADER */}
+      <div style={{ padding: '40px 20px 16px', ...animStyle(0) }}>
+        <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 30, fontWeight: 700, color: T1, letterSpacing: '-0.02em', marginBottom: 4 }}>
           {isEs ? 'Historial' : 'History'}
         </h1>
-        <p className="text-sm" style={{ color: '#555' }}>
-          {sessions.length} {isEs ? 'sesiones' : 'sessions'}
+        <p style={{ fontSize: 13, color: T2 }}>
+          {loading ? '...' : sessions.length + ' ' + (isEs ? 'sesiones en total' : 'total sessions')}
         </p>
       </div>
 
-      {sessions.length === 0 ? (
-        <div className="px-4">
-          <div className="rounded-2xl p-8 text-center" style={{ background: '#111118', border: '1px solid #1a1a2e' }}>
-            <p className="font-bold mb-1" style={{ color: '#fff' }}>
-              {isEs ? 'Sin sesiones todavia' : 'No sessions yet'}
+      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* FILTER PILLS */}
+        <div style={{ display: 'flex', gap: 8, ...animStyle(0) }}>
+          {(['week', 'month', 'year'] as FilterPeriod[]).map(p => (
+            <button key={p} onClick={() => setFilter(p)} style={{
+              padding: '8px 18px', borderRadius: 100, fontSize: 12, fontWeight: 700,
+              fontFamily: 'Syne, sans-serif', cursor: 'pointer', transition: 'all 0.15s',
+              background: filter === p ? ACC : CARD,
+              color: filter === p ? BG : T2,
+              border: '1px solid ' + (filter === p ? 'transparent' : BORDER),
+            }}>
+              {isEs ? filterLabels[p].es : filterLabels[p].en}
+            </button>
+          ))}
+        </div>
+
+        {/* KPI STRIP */}
+        {loading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, ...animStyle(80) }}>
+            {[1,2,3].map(i => <Skel key={i} h={72} />)}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, ...animStyle(80) }}>
+            {[
+              { label: isEs ? 'Sesiones' : 'Sessions', value: String(filtered.length), color: T1 },
+              { label: isEs ? 'Tiempo total' : 'Total time', value: totalDuration > 0 ? Math.round(totalDuration / 60) + 'h' : '—', color: T1 },
+              { label: isEs ? 'Este mes' : 'This period', value: filtered.filter(s => { const d = new Date(s.session_date); const m = new Date(); return d.getMonth() === m.getMonth(); }).length + '', color: ACC },
+            ].map(k => (
+              <div key={k.label} style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 14, padding: '14px', textAlign: 'center' }}>
+                <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 6 }}>{k.label}</p>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 700, color: k.color }}>{k.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* CHART */}
+        {!loading && chartData.length > 1 && (
+          <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '16px', ...animStyle(120) }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 12 }}>
+              {isEs ? 'Sesiones por semana' : 'Sessions per week'}
             </p>
-            <p className="text-sm mb-4" style={{ color: '#666' }}>
-              {isEs ? 'Completa tu primer entrenamiento' : 'Complete your first workout'}
+            <ResponsiveContainer width="100%" height={90}>
+              <BarChart data={chartData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }} barCategoryGap="35%">
+                <XAxis dataKey="week" tick={{ fill: T3, fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis hide />
+                <Tooltip
+                  cursor={{ fill: 'rgba(200,255,0,0.05)' }}
+                  contentStyle={{ background: '#16161f', border: '1px solid rgba(200,255,0,0.2)', borderRadius: 10, color: T1, fontSize: 12 }}
+                  formatter={(v: unknown) => [`${v}`, isEs ? 'Sesiones' : 'Sessions'] as [string, string]}
+                />
+                <Bar dataKey="count" radius={[5, 5, 0, 0]}>
+                  {chartData.map((_, i) => <Cell key={i} fill={i === chartData.length - 1 ? ACC : '#222230'} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* SESSION LIST */}
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, ...animStyle(160) }}>
+            {[1,2,3,4].map(i => <Skel key={i} h={64} />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '48px 20px', textAlign: 'center', ...animStyle(160) }}>
+            <p style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: T1, marginBottom: 8 }}>
+              {isEs ? 'Sin sesiones en este período' : 'No sessions in this period'}
             </p>
-            <Link href={`/${locale}/session/new`}
-              className="inline-block px-6 py-3 rounded-xl font-bold"
-              style={{ background: '#C8FF00', color: '#0A0A0F' }}>
+            <p style={{ fontSize: 13, color: T3, marginBottom: 20 }}>
+              {isEs ? 'Completa un entrenamiento para verlo aqui' : 'Complete a workout to see it here'}
+            </p>
+            <Link href={`/${locale}/session/new`} style={{ display: 'inline-block', background: 'rgba(200,255,0,0.1)', color: ACC, border: '1px solid rgba(200,255,0,0.2)', borderRadius: 12, padding: '12px 28px', fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 700 }}>
               {isEs ? 'Entrenar' : 'Train'}
             </Link>
           </div>
-        </div>
-      ) : (
-        <div className="px-4 space-y-2">
-          {sessions.map(s => {
-            const date = new Date(s.session_date)
-            const label = date.toLocaleDateString(
-              isEs ? 'es-ES' : 'en-US',
-              { weekday: 'long', day: 'numeric', month: 'long' }
-            )
-            return (
-              <Link key={s.id} href={`/${locale}/session/${s.id}`}
-                className="flex items-center gap-4 p-4 rounded-2xl"
-                style={{ background: '#111118', border: '1px solid #1a1a2e' }}>
-                <div className="flex-1">
-                  <p className="font-medium capitalize" style={{ color: '#ddd' }}>{label}</p>
-                  <p className="text-xs mt-0.5" style={{ color: '#555' }}>
-                    {s.duration_minutes ? `${s.duration_minutes}min` : '-'}
-                  </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, ...animStyle(160) }}>
+            {filtered.map(s => {
+              const date = new Date(s.session_date)
+              const label = date.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+              const isExp = expanded === s.id
+              return (
+                <div key={s.id} style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 16, overflow: 'hidden' }}>
+                  <button style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', minHeight: 56 }}
+                    onClick={() => setExpanded(isExp ? null : s.id)}>
+                    <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(200,255,0,0.08)', color: ACC, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                      {date.getDate()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontWeight: 600, fontSize: 14, color: T1, textTransform: 'capitalize', fontFamily: 'Syne, sans-serif', marginBottom: 2 }}>{label}</p>
+                      <p style={{ fontSize: 11, color: T3 }}>
+                        {s.duration_minutes ? `${s.duration_minutes}min` : '—'}
+                        {s.day_label ? ` · ${s.day_label}` : ''}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                      {s.pump_rating    != null && <span style={{ fontSize: 12, fontWeight: 700, color: ACC, fontFamily: 'DM Mono, monospace' }}>{s.pump_rating}</span>}
+                      {s.local_fatigue  != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B6B', fontFamily: 'DM Mono, monospace' }}>{s.local_fatigue}</span>}
+                      {s.perceived_recovery != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#4ECDC4', fontFamily: 'DM Mono, monospace' }}>{s.perceived_recovery}</span>}
+                      <span style={{ color: T3, fontSize: 16, transform: isExp ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>›</span>
+                    </div>
+                  </button>
+                  {isExp && (
+                    <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
+                        {[
+                          { label: 'Pump', value: s.pump_rating ?? '—', color: ACC },
+                          { label: isEs ? 'Fatiga' : 'Fatigue', value: s.local_fatigue ?? '—', color: '#FF6B6B' },
+                          { label: isEs ? 'Recuper.' : 'Recovery', value: s.perceived_recovery ?? '—', color: '#4ECDC4' },
+                          { label: isEs ? 'Duración' : 'Duration', value: s.duration_minutes ? `${s.duration_minutes}m` : '—', color: T1 },
+                        ].map(m => (
+                          <div key={m.label}>
+                            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T3, marginBottom: 3 }}>{m.label}</p>
+                            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Link href={`/${locale}/session/${s.id}`} style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#16161f', color: T2, border: '1px solid ' + BORDER }}>
+                          {isEs ? 'Ver detalle →' : 'View detail →'}
+                        </Link>
+                        <button onClick={() => setDeleteModal(s)} style={{ padding: '10px 14px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.08)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.15)', cursor: 'pointer' }}>
+                          {isEs ? 'Eliminar' : 'Delete'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2 text-xs" style={{ fontFamily: 'DM Mono, monospace' }}>
-                  {s.pump_rating != null && <span style={{ color: '#C8FF00' }}>{s.pump_rating}</span>}
-                  {s.local_fatigue != null && <span style={{ color: '#FF6B6B' }}>{s.local_fatigue}</span>}
-                  {s.perceived_recovery != null && <span style={{ color: '#4ECDC4' }}>{s.perceived_recovery}</span>}
-                </div>
-                <span style={{ color: '#333' }}>{'>'}</span>
-              </Link>
-            )
-          })}
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* DELETE MODAL */}
+      {deleteModal && (
+        <div onClick={() => !deleting && setDeleteModal(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#111118', border: '1px solid rgba(255,107,107,0.2)', borderRadius: 22, padding: '28px 24px', maxWidth: 340, width: '100%' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 700, color: T1, marginBottom: 10 }}>
+              {isEs ? '¿Eliminar sesión?' : 'Delete session?'}
+            </p>
+            <p style={{ fontSize: 13, color: T2, marginBottom: 6, lineHeight: 1.5 }}>
+              {isEs ? 'Esta acción es permanente. Se eliminarán todos los ejercicios y series de la sesión del' : 'This action is permanent. All exercises and sets from the session on'}
+            </p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#FF6B6B', marginBottom: 24, fontFamily: 'DM Mono, monospace' }}>
+              {new Date(deleteModal.session_date).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setDeleteModal(null)} disabled={deleting} style={{ flex: 1, padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#1a1a2e', color: T2, border: 'none', cursor: 'pointer' }}>
+                {isEs ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button onClick={doDelete} disabled={deleting} style={{ flex: 1, padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.15)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.3)', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? '...' : (isEs ? 'Eliminar' : 'Delete')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
