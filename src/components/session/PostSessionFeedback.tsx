@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSessionStore } from '@/stores/session.store'
+import { ProgressionSuggestionsPanel } from '@/components/workout/ProgressionSuggestionsPanel'
 
 interface Props {
   sessionId: string
@@ -45,11 +46,34 @@ export default function PostSessionFeedback({ sessionId, locale }: Props) {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const isEs = locale === 'es'
 
   const currentStep = STEPS[feedbackStep]
   const isRirStep = feedbackStep === STEPS.length
   const totalSteps = STEPS.length + 1
+
+  if (showSuggestions) {
+    return (
+      <div style={{ background: '#0A0A0F', minHeight: '100vh', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#fff', fontFamily: 'Syne, sans-serif' }}>
+            {isEs ? '¡Sesión completada! 🎉' : 'Session complete! 🎉'}
+          </h2>
+        </div>
+        <ProgressionSuggestionsPanel
+          sessionId={sessionId}
+          locale={locale}
+        />
+        <button
+          onClick={() => router.push(`/${locale}/dashboard?completed=true`)}
+          style={{ marginTop: '8px', width: '100%', padding: '16px', background: 'linear-gradient(135deg,#C8FF00 0%,#88DD00 100%)', border: 'none', borderRadius: '14px', color: '#0A0A0F', fontSize: '16px', fontWeight: '800', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}
+        >
+          {isEs ? 'Ir al Dashboard →' : 'Go to Dashboard →'}
+        </button>
+      </div>
+    )
+  }
 
   const handleRating = (value: number) => {
     setFeedbackField(currentStep.key, value)
@@ -73,7 +97,7 @@ export default function PostSessionFeedback({ sessionId, locale }: Props) {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error saving feedback')
       resetFeedback()
-      router.push(`/${locale}/dashboard?completed=true`)
+      setShowSuggestions(true)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error guardando feedback'
       setError(msg)

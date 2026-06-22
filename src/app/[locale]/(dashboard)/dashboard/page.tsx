@@ -4,6 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { MuscleVolumeChart } from '@/components/dashboard/MuscleVolumeChart'
+import { MesocycleWidget } from '@/components/dashboard/MesocycleWidget'
+import { MesocycleCreateModal } from '@/components/dashboard/MesocycleCreateModal'
 
 const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
@@ -18,6 +20,7 @@ export default function DashboardPage() {
   const isEs = locale === 'es'
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [showCreateMeso, setShowCreateMeso] = useState(false)
 
   useEffect(() => {
     fetch('/api/dashboard/summary')
@@ -129,6 +132,11 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Mesociclo activo */}
+        <div className="fade-in s3">
+          <MesocycleWidget locale={locale} onCreateClick={() => setShowCreateMeso(true)} />
+        </div>
+
         {/* Volumen por musculo */}
         <div className="fade-in s3">
           <MuscleVolumeChart locale={locale} />
@@ -212,6 +220,14 @@ export default function DashboardPage() {
               })}
             </div>
           </div>
+        )}
+
+        {showCreateMeso && (
+          <MesocycleCreateModal
+            locale={locale}
+            onClose={() => setShowCreateMeso(false)}
+            onCreated={() => setShowCreateMeso(false)}
+          />
         )}
 
         {/* Empty state */}
