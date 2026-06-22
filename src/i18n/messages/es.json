@@ -1,23 +1,4 @@
 {
-  "nav": {
-    "dashboard": "Panel",
-    "training": "Entrenar",
-    "history": "Historial",
-    "templates": "Plantillas",
-    "exercises": "Ejercicios",
-    "import": "Importar",
-    "coach": "Coach IA",
-    "settings": "Ajustes"
-  },
-  "auth": {
-    "login": "Iniciar sesión",
-    "register": "Crear cuenta",
-    "logout": "Cerrar sesión",
-    "email": "Email",
-    "password": "Contraseña",
-    "noAccount": "¿No tienes cuenta?",
-    "haveAccount": "¿Ya tienes cuenta?"
-  },
   "training": {
     "startSession": "Iniciar sesión",
     "endSession": "Finalizar sesión",
@@ -36,29 +17,6 @@
     "noTemplates": "Sin plantillas. Crea una para empezar.",
     "freeSession": "Sesión libre"
   },
-  "exercises": {
-    "search": "Buscar ejercicios",
-    "filter": "Filtrar",
-    "allGroups": "Todos los grupos",
-    "chest": "Pecho",
-    "back": "Espalda",
-    "shoulders": "Hombros",
-    "biceps": "Bíceps",
-    "triceps": "Tríceps",
-    "legs": "Piernas",
-    "glutes": "Glúteos",
-    "core": "Core",
-    "calves": "Gemelos",
-    "createExercise": "Crear ejercicio"
-  },
-  "coach": {
-    "analyzing": "Analizando historial...",
-    "recommendation": "Recomendación",
-    "accept": "Aplicar",
-    "modify": "Modificar",
-    "ignore": "Ignorar",
-    "disclaimer": "Sugerencia de IA. Tú decides."
-  },
   "progression": {
     "increaseWeight": "Sube el peso",
     "increaseReps": "Aumenta las reps",
@@ -76,14 +34,27 @@
     "skip": "Omitir",
     "noted": "Anotado"
   },
-  "volume": {
-    "weeklyVolume": "Volumen Semanal",
-    "optimal": "Óptimo",
-    "belowMev": "Bajo MEV",
-    "high": "Alto",
-    "aboveMrv": "Sobre MRV",
-    "sets": "sets",
-    "noData": "Sin datos esta semana"
+  "import": {
+    "title": "Importar Programa",
+    "subtitle": "Sube tu programa y la IA lo analizara",
+    "dropzone": "Arrastra tu archivo aqui",
+    "dropzoneOr": "o haz clic para seleccionar",
+    "formats": "PDF, imagen, Excel, Word o texto",
+    "processing": "Analizando con IA...",
+    "processingDesc": "Extrayendo ejercicios, nutricion y sesiones historicas",
+    "reviewTitle": "Revision de datos extraidos",
+    "profileSection": "Perfil del atleta",
+    "nutritionSection": "Nutricion",
+    "programSection": "Programa de entrenamiento",
+    "sessionsSection": "Sesiones historicas",
+    "applySelected": "Aplicar seleccionados",
+    "confidence": "Precision",
+    "done": "Importacion completada",
+    "error": "Error en la importacion",
+    "retry": "Intentar de nuevo",
+    "cancel": "Cancelar",
+    "importAnother": "Importar otro",
+    "viewProfile": "Ver perfil"
   },
   "common": {
     "save": "Guardar",
@@ -97,6 +68,12 @@
     "back": "Volver",
     "next": "Siguiente",
     "done": "Hecho"
+  },
+  "deload": {
+    "recommended": "Semana de Descarga Recomendada",
+    "stallingDetected": "Estancamiento Detectado",
+    "description": "Tu cuerpo lleva varias sesiones sin progresar. Una semana de descarga optimizara tu recuperacion.",
+    "dismiss": "Ignorar"
   },
   "mesocycle": {
     "active": "Mesociclo activo",
@@ -128,10 +105,67 @@
       "advanced": "Avanzado"
     }
   },
-  "deload": {
-    "recommended": "Semana de Descarga Recomendada",
-    "stallingDetected": "Estancamiento Detectado",
-    "description": "Tu cuerpo lleva varias sesiones sin progresar. Una semana de descarga optimizara tu recuperacion.",
-    "dismiss": "Ignorar"
+  "nav": {
+    "dashboard": "Panel",
+    "training": "Entrenar",
+    "history": "Historial",
+    "templates": "Plantillas",
+    "exercises": "Ejercicios",
+    "import": "Importar",
+    "coach": "Coach IA",
+    "settings": "Ajustes"
+  },
+  "nutrition": {
+    "title": "Nutricion",
+    "calories": "Calorias objetivo",
+    "protein": "Proteinas (g)",
+    "carbs": "Carbohidratos (g)",
+    "fat": "Grasas (g)",
+    "meals": "Comidas al dia",
+    "notes": "Notas nutricionales",
+    "kcal": "kcal/dia",
+    "splitDetected": "Split detectado",
+    "importedFrom": "Importado automaticamente"
+  },
+  "coach": {
+    "analyzing": "Analizando historial...",
+    "recommendation": "Recomendación",
+    "accept": "Aplicar",
+    "modify": "Modificar",
+    "ignore": "Ignorar",
+    "disclaimer": "Sugerencia de IA. Tú decides."
+  },
+  "exercises": {
+    "search": "Buscar ejercicios",
+    "filter": "Filtrar",
+    "allGroups": "Todos los grupos",
+    "chest": "Pecho",
+    "back": "Espalda",
+    "shoulders": "Hombros",
+    "biceps": "Bíceps",
+    "triceps": "Tríceps",
+    "legs": "Piernas",
+    "glutes": "Glúteos",
+    "core": "Core",
+    "calves": "Gemelos",
+    "createExercise": "Crear ejercicio"
+  },
+  "volume": {
+    "weeklyVolume": "Volumen Semanal",
+    "optimal": "Óptimo",
+    "belowMev": "Bajo MEV",
+    "high": "Alto",
+    "aboveMrv": "Sobre MRV",
+    "sets": "sets",
+    "noData": "Sin datos esta semana"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "register": "Crear cuenta",
+    "logout": "Cerrar sesión",
+    "email": "Email",
+    "password": "Contraseña",
+    "noAccount": "¿No tienes cuenta?",
+    "haveAccount": "¿Ya tienes cuenta?"
   }
 }

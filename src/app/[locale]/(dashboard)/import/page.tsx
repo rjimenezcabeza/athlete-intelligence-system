@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import ImportCard from '@/components/import/ImportCard'
+import { SmartImporter } from '@/components/import/SmartImporter'
 
 interface ImportRecord {
   id: string; original_filename: string; file_type: string
@@ -83,6 +84,7 @@ export default function ImportPage() {
       </div>
 
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <SmartImporter locale={locale} onComplete={load} />
         <ImportCard locale={locale} onImportComplete={load} />
 
         {imports.length > 0 && (

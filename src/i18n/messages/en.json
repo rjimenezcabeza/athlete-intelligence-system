@@ -1,23 +1,4 @@
 {
-  "nav": {
-    "dashboard": "Dashboard",
-    "training": "Train",
-    "history": "History",
-    "templates": "Templates",
-    "exercises": "Exercises",
-    "import": "Import",
-    "coach": "AI Coach",
-    "settings": "Settings"
-  },
-  "auth": {
-    "login": "Sign in",
-    "register": "Create account",
-    "logout": "Sign out",
-    "email": "Email",
-    "password": "Password",
-    "noAccount": "Don't have an account?",
-    "haveAccount": "Already have an account?"
-  },
   "training": {
     "startSession": "Start session",
     "endSession": "End session",
@@ -36,29 +17,6 @@
     "noTemplates": "No templates. Create one to start.",
     "freeSession": "Free session"
   },
-  "exercises": {
-    "search": "Search exercises",
-    "filter": "Filter",
-    "allGroups": "All muscle groups",
-    "chest": "Chest",
-    "back": "Back",
-    "shoulders": "Shoulders",
-    "biceps": "Biceps",
-    "triceps": "Triceps",
-    "legs": "Legs",
-    "glutes": "Glutes",
-    "core": "Core",
-    "calves": "Calves",
-    "createExercise": "Create exercise"
-  },
-  "coach": {
-    "analyzing": "Analyzing history...",
-    "recommendation": "Recommendation",
-    "accept": "Apply",
-    "modify": "Modify",
-    "ignore": "Ignore",
-    "disclaimer": "AI suggestion. You decide."
-  },
   "progression": {
     "increaseWeight": "Increase weight",
     "increaseReps": "Increase reps",
@@ -76,14 +34,27 @@
     "skip": "Skip",
     "noted": "Noted"
   },
-  "volume": {
-    "weeklyVolume": "Weekly Volume",
-    "optimal": "Optimal",
-    "belowMev": "Below MEV",
-    "high": "High",
-    "aboveMrv": "Above MRV",
-    "sets": "sets",
-    "noData": "No data this week"
+  "import": {
+    "title": "Import Program",
+    "subtitle": "Upload your program and AI will analyze it",
+    "dropzone": "Drop your file here",
+    "dropzoneOr": "or click to select",
+    "formats": "PDF, image, Excel, Word or text",
+    "processing": "Analyzing with AI...",
+    "processingDesc": "Extracting exercises, nutrition and sessions",
+    "reviewTitle": "Extracted data review",
+    "profileSection": "Athlete profile",
+    "nutritionSection": "Nutrition",
+    "programSection": "Training program",
+    "sessionsSection": "Historical sessions",
+    "applySelected": "Apply selected",
+    "confidence": "Accuracy",
+    "done": "Import completed",
+    "error": "Import error",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "importAnother": "Import another",
+    "viewProfile": "View profile"
   },
   "common": {
     "save": "Save",
@@ -97,6 +68,12 @@
     "back": "Back",
     "next": "Next",
     "done": "Done"
+  },
+  "deload": {
+    "recommended": "Deload Week Recommended",
+    "stallingDetected": "Stalling Detected",
+    "description": "Several sessions without progress detected. A deload week will optimize your recovery.",
+    "dismiss": "Dismiss"
   },
   "mesocycle": {
     "active": "Active mesocycle",
@@ -128,10 +105,67 @@
       "advanced": "Advanced"
     }
   },
-  "deload": {
-    "recommended": "Deload Week Recommended",
-    "stallingDetected": "Stalling Detected",
-    "description": "Several sessions without progress detected. A deload week will optimize your recovery.",
-    "dismiss": "Dismiss"
+  "nav": {
+    "dashboard": "Dashboard",
+    "training": "Train",
+    "history": "History",
+    "templates": "Templates",
+    "exercises": "Exercises",
+    "import": "Import",
+    "coach": "AI Coach",
+    "settings": "Settings"
+  },
+  "nutrition": {
+    "title": "Nutrition",
+    "calories": "Target calories",
+    "protein": "Protein (g)",
+    "carbs": "Carbohydrates (g)",
+    "fat": "Fat (g)",
+    "meals": "Meals per day",
+    "notes": "Nutrition notes",
+    "kcal": "kcal/day",
+    "splitDetected": "Detected split",
+    "importedFrom": "Auto-imported"
+  },
+  "coach": {
+    "analyzing": "Analyzing history...",
+    "recommendation": "Recommendation",
+    "accept": "Apply",
+    "modify": "Modify",
+    "ignore": "Ignore",
+    "disclaimer": "AI suggestion. You decide."
+  },
+  "exercises": {
+    "search": "Search exercises",
+    "filter": "Filter",
+    "allGroups": "All muscle groups",
+    "chest": "Chest",
+    "back": "Back",
+    "shoulders": "Shoulders",
+    "biceps": "Biceps",
+    "triceps": "Triceps",
+    "legs": "Legs",
+    "glutes": "Glutes",
+    "core": "Core",
+    "calves": "Calves",
+    "createExercise": "Create exercise"
+  },
+  "volume": {
+    "weeklyVolume": "Weekly Volume",
+    "optimal": "Optimal",
+    "belowMev": "Below MEV",
+    "high": "High",
+    "aboveMrv": "Above MRV",
+    "sets": "sets",
+    "noData": "No data this week"
+  },
+  "auth": {
+    "login": "Sign in",
+    "register": "Create account",
+    "logout": "Sign out",
+    "email": "Email",
+    "password": "Password",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?"
   }
 }

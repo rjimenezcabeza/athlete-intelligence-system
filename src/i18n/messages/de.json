@@ -1,23 +1,4 @@
 {
-  "nav": {
-    "dashboard": "Dashboard",
-    "training": "Training",
-    "history": "Verlauf",
-    "templates": "Vorlagen",
-    "exercises": "Übungen",
-    "import": "Importieren",
-    "coach": "KI-Coach",
-    "settings": "Einstellungen"
-  },
-  "auth": {
-    "login": "Anmelden",
-    "register": "Konto erstellen",
-    "logout": "Abmelden",
-    "email": "E-Mail",
-    "password": "Passwort",
-    "noAccount": "Noch kein Konto?",
-    "haveAccount": "Bereits ein Konto?"
-  },
   "training": {
     "startSession": "Einheit starten",
     "endSession": "Einheit beenden",
@@ -36,29 +17,6 @@
     "noTemplates": "Keine Vorlagen. Erstelle eine, um anzufangen.",
     "freeSession": "Freie Einheit"
   },
-  "exercises": {
-    "search": "Übungen suchen",
-    "filter": "Filtern",
-    "allGroups": "Alle Muskelgruppen",
-    "chest": "Brust",
-    "back": "Rücken",
-    "shoulders": "Schultern",
-    "biceps": "Bizeps",
-    "triceps": "Trizeps",
-    "legs": "Beine",
-    "glutes": "Gesäß",
-    "core": "Core",
-    "calves": "Waden",
-    "createExercise": "Übung erstellen"
-  },
-  "coach": {
-    "analyzing": "Verlauf wird analysiert...",
-    "recommendation": "Empfehlung",
-    "accept": "Anwenden",
-    "modify": "Ändern",
-    "ignore": "Ignorieren",
-    "disclaimer": "KI-Vorschlag. Du entscheidest."
-  },
   "progression": {
     "increaseWeight": "Gewicht erhöhen",
     "increaseReps": "Wiederholungen erhöhen",
@@ -76,14 +34,27 @@
     "skip": "Ueberspringen",
     "noted": "Notiert"
   },
-  "volume": {
-    "weeklyVolume": "Wochenvolumen",
-    "optimal": "Optimal",
-    "belowMev": "Unter MEV",
-    "high": "Hoch",
-    "aboveMrv": "Über MRV",
-    "sets": "Sätze",
-    "noData": "Keine Daten diese Woche"
+  "import": {
+    "title": "Programm importieren",
+    "subtitle": "Laden Sie Ihr Trainingsprogramm hoch",
+    "dropzone": "Datei hier ablegen",
+    "dropzoneOr": "oder klicken zum Auswaehlen",
+    "formats": "PDF, Bild, Excel, Word oder Text",
+    "processing": "KI-Analyse laeuft...",
+    "processingDesc": "Extrahiere Uebungen, Ernaehrung und Einheiten",
+    "reviewTitle": "Extrahierte Daten pruefen",
+    "profileSection": "Athletenprofil",
+    "nutritionSection": "Ernaehrung",
+    "programSection": "Trainingsprogramm",
+    "sessionsSection": "Historische Einheiten",
+    "applySelected": "Ausgewaehlt anwenden",
+    "confidence": "Genauigkeit",
+    "done": "Import abgeschlossen",
+    "error": "Importfehler",
+    "retry": "Erneut versuchen",
+    "cancel": "Abbrechen",
+    "importAnother": "Weiteres importieren",
+    "viewProfile": "Profil anzeigen"
   },
   "common": {
     "save": "Speichern",
@@ -97,6 +68,12 @@
     "back": "Zurück",
     "next": "Weiter",
     "done": "Fertig"
+  },
+  "deload": {
+    "recommended": "Deload-Woche empfohlen",
+    "stallingDetected": "Stagnation erkannt",
+    "description": "Mehrere Einheiten ohne Fortschritt. Eine Deload-Woche wird Ihre Erholung optimieren.",
+    "dismiss": "Ignorieren"
   },
   "mesocycle": {
     "active": "Aktiver Mesozyklus",
@@ -128,10 +105,67 @@
       "advanced": "Fortgeschritten"
     }
   },
-  "deload": {
-    "recommended": "Deload-Woche empfohlen",
-    "stallingDetected": "Stagnation erkannt",
-    "description": "Mehrere Einheiten ohne Fortschritt. Eine Deload-Woche wird Ihre Erholung optimieren.",
-    "dismiss": "Ignorieren"
+  "nav": {
+    "dashboard": "Dashboard",
+    "training": "Training",
+    "history": "Verlauf",
+    "templates": "Vorlagen",
+    "exercises": "Übungen",
+    "import": "Importieren",
+    "coach": "KI-Coach",
+    "settings": "Einstellungen"
+  },
+  "nutrition": {
+    "title": "Ernaehrung",
+    "calories": "Kalorienziel",
+    "protein": "Protein (g)",
+    "carbs": "Kohlenhydrate (g)",
+    "fat": "Fett (g)",
+    "meals": "Mahlzeiten pro Tag",
+    "notes": "Ernaehrungsnotizen",
+    "kcal": "kcal/Tag",
+    "splitDetected": "Erkannter Split",
+    "importedFrom": "Automatisch importiert"
+  },
+  "coach": {
+    "analyzing": "Verlauf wird analysiert...",
+    "recommendation": "Empfehlung",
+    "accept": "Anwenden",
+    "modify": "Ändern",
+    "ignore": "Ignorieren",
+    "disclaimer": "KI-Vorschlag. Du entscheidest."
+  },
+  "exercises": {
+    "search": "Übungen suchen",
+    "filter": "Filtern",
+    "allGroups": "Alle Muskelgruppen",
+    "chest": "Brust",
+    "back": "Rücken",
+    "shoulders": "Schultern",
+    "biceps": "Bizeps",
+    "triceps": "Trizeps",
+    "legs": "Beine",
+    "glutes": "Gesäß",
+    "core": "Core",
+    "calves": "Waden",
+    "createExercise": "Übung erstellen"
+  },
+  "volume": {
+    "weeklyVolume": "Wochenvolumen",
+    "optimal": "Optimal",
+    "belowMev": "Unter MEV",
+    "high": "Hoch",
+    "aboveMrv": "Über MRV",
+    "sets": "Sätze",
+    "noData": "Keine Daten diese Woche"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "register": "Konto erstellen",
+    "logout": "Abmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "noAccount": "Noch kein Konto?",
+    "haveAccount": "Bereits ein Konto?"
   }
 }

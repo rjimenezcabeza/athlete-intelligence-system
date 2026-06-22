@@ -67,6 +67,25 @@ export default function DashboardPage() {
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+        {/* Banner importacion — solo para usuarios sin import_onboarded_at */}
+        {!loading && !data?.profile?.import_onboarded_at && (
+          <a href={`/${locale}/import`} style={{ display: 'block', padding: '16px', background: 'rgba(200,255,0,0.06)', border: '1px solid rgba(200,255,0,0.2)', borderRadius: '14px', textDecoration: 'none' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#C8FF00', fontFamily: 'Syne, sans-serif', marginBottom: '4px' }}>
+                  {isEs ? 'Importa tu programa actual' : 'Import your current program'}
+                </div>
+                <div style={{ fontSize: '11px', color: '#666', fontFamily: 'DM Mono, monospace' }}>
+                  {isEs ? 'PDF, imagen, Excel — la IA lo analiza automáticamente' : 'PDF, image, Excel — AI analyzes it automatically'}
+                </div>
+              </div>
+              <span style={{ padding: '8px 14px', background: '#C8FF00', borderRadius: '8px', color: '#0A0A0F', fontSize: '12px', fontWeight: '700', fontFamily: 'Syne, sans-serif', flexShrink: 0 }}>
+                {isEs ? 'Importar' : 'Import'}
+              </span>
+            </div>
+          </a>
+        )}
+
         {/* Deload alert — solo visible cuando hay estancamiento */}
         <DeloadAlert locale={locale} />
 

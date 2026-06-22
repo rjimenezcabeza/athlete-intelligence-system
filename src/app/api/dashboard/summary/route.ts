@@ -27,7 +27,7 @@ export async function GET() {
     const admin = db()
     const { data: profile } = await (admin as any)
       .from('athlete_profiles')
-      .select('id, display_name, subscription_tier, primary_goal, training_experience_years')
+      .select('id, display_name, subscription_tier, primary_goal, training_experience_years, import_onboarded_at')
       .eq('user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 

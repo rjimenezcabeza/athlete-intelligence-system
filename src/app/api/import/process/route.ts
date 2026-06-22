@@ -119,7 +119,25 @@ function xlsxToText(buffer: Buffer): string {
   return result || 'No content'
 }
 
-const SCHEMA = '{"confidence":0.85,"extraction_notes":"found sessions","sessions":[{"date":"2024-01-15","day_label":"Push A","exercises":[{"name":"Press Banca","muscle_group":"chest","sets":[{"set_number":1,"weight_kg":80.0,"reps":8,"rir":2,"set_type":"working"}]}]}]}'
+const SCHEMA = `{
+  "athlete": {"display_name":null,"body_weight_kg":null,"height_cm":null,"training_experience_years":null,"primary_goal":null},
+  "nutrition": {"calories_target":null,"protein_g":null,"carbs_g":null,"fat_g":null,"meals_per_day":null,"notes":null},
+  "training_program": {
+    "name":null,"split_type":null,"days_per_week":null,"mesocycle_weeks":null,
+    "days":[{"day_number":1,"day_label":"Push","exercises":[{"name":"Press Banca","sets":4,"rep_range_min":8,"rep_range_max":12,"rir_target":2,"rest_seconds":120,"notes":null}]}]
+  },
+  "training_sessions": [{"date":"2024-01-15","day_label":"Push A","exercises":[{"name":"Press Banca","sets":[{"set_number":1,"weight_kg":80.0,"reps":8,"rir":2,"set_type":"working"}]}]}],
+  "confidence":0.85,
+  "notes":null
+}`
+
+const SYSTEM_PROMPT = `Eres un experto en análisis de programas de entrenamiento para hipertrofia.
+Extrae TODOS los datos disponibles: perfil del atleta, nutrición, programa de entrenamiento y sesiones históricas.
+Normaliza pesos: si están en lbs, convierte a kg (divide entre 2.2046).
+Para split_type usa: PPL, Upper/Lower, Torso/Pierna, Full Body, Bro Split, Arnold Split.
+primary_goal acepta: hypertrophy, strength, weight_loss, endurance.
+Si alguna sección no existe en el documento, usa null o array vacío.
+Devuelve SOLO JSON válido sin backticks ni texto adicional.`
 
 export async function POST(req: NextRequest) {
   let importId = ''
@@ -184,9 +202,10 @@ export async function POST(req: NextRequest) {
       console.log('[process] calling anthropic for image...')
       const r = await anthropic.messages.create({
         model: 'claude-sonnet-4-6', max_tokens: 4096,
+        system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: mime, data: buf.toString('base64') } },
-          { type: 'text', text: 'Extract training sessions. Return ONLY valid JSON: ' + SCHEMA }
+          { type: 'text', text: 'Analiza este documento y extrae todos los datos. Formato JSON exacto: ' + SCHEMA }
         ]}]
       })
       rawText = (r.content[0] as any).text ?? '{}'
@@ -195,14 +214,16 @@ export async function POST(req: NextRequest) {
       console.log('[process] calling anthropic for excel, text len:', text.length)
       const r = await anthropic.messages.create({
         model: 'claude-sonnet-4-6', max_tokens: 4096,
-        messages: [{ role: 'user', content: 'Extract ALL training sessions. Return ONLY valid JSON: ' + SCHEMA + '\n\nData:\n' + text }]
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: 'Extrae TODOS los datos de entrenamiento y nutrición. Formato JSON exacto: ' + SCHEMA + '\n\nDatos:\n' + text }]
       })
       rawText = (r.content[0] as any).text ?? '{}'
     } else {
       const text = ascii(buf.toString('utf8'), 6000)
       const r = await anthropic.messages.create({
         model: 'claude-sonnet-4-6', max_tokens: 4096,
-        messages: [{ role: 'user', content: 'Extract training sessions. Return ONLY valid JSON: ' + SCHEMA + '\n\n' + text }]
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: 'Extrae todos los datos de entrenamiento y nutrición. Formato JSON exacto: ' + SCHEMA + '\n\n' + text }]
       })
       rawText = (r.content[0] as any).text ?? '{}'
     }
@@ -210,34 +231,62 @@ export async function POST(req: NextRequest) {
     console.log('[process] anthropic response len:', rawText.length, 'preview:', rawText.slice(0, 80))
     const extractedData = safeParseJSON(rawText)
     const confidence = Number(extractedData?.confidence ?? 0)
-    const sessions = (extractedData?.sessions ?? []).filter((s: any) => s?.exercises?.length > 0)
-    console.log('[process] confidence:', confidence, 'sessions:', sessions.length)
 
-    if (sessions.length > 0) {
-      await (admin as any).from('import_review_items').insert(
-        sessions.map((s: any) => ({
-          imported_file_id: importId, item_type: 'session',
-          raw_extracted: s, review_status: 'pending', confidence_score: confidence
-        }))
-      )
+    // Soporte schema antiguo (solo sessions[]) y nuevo schema completo
+    const legacySessions = (extractedData?.sessions ?? []).filter((s: any) => s?.exercises?.length > 0)
+    const newSessions = (extractedData?.training_sessions ?? []).filter((s: any) => s?.exercises?.length > 0)
+    const sessions = newSessions.length > 0 ? newSessions : legacySessions
+    const hasProgram = !!(extractedData?.training_program?.days?.length)
+    const hasProfile = !!(extractedData?.athlete)
+    const hasNutrition = !!(extractedData?.nutrition?.calories_target || extractedData?.nutrition?.protein_g)
+    console.log('[process] confidence:', confidence, 'sessions:', sessions.length, 'hasProgram:', hasProgram)
+
+    // Guardar review items
+    const reviewItems: any[] = []
+
+    if (hasProfile || hasNutrition || hasProgram) {
+      reviewItems.push({
+        imported_file_id: importId, item_type: 'template',
+        raw_extracted: {
+          type: 'profile_nutrition_program',
+          athlete: extractedData.athlete,
+          nutrition: extractedData.nutrition,
+          training_program: extractedData.training_program
+        },
+        review_status: 'pending', confidence_score: confidence
+      })
     }
 
-    const status = confidence < 0.3 ? 'error' : 'review_required'
-    // Guardar en DB (puede ser grande — no devolver al cliente)
+    for (const s of sessions) {
+      reviewItems.push({
+        imported_file_id: importId, item_type: 'session',
+        raw_extracted: s, review_status: 'pending', confidence_score: confidence
+      })
+    }
+
+    if (reviewItems.length > 0) {
+      await (admin as any).from('import_review_items').insert(reviewItems)
+    }
+
+    const hasAnyData = sessions.length > 0 || hasProgram || hasProfile || hasNutrition
+    const status = confidence < 0.3 || !hasAnyData ? 'error' : 'review_required'
+
     await (admin as any).from('imported_files').update({
       import_status: status,
       extracted_data: extractedData,
       extraction_confidence: confidence,
-      extraction_notes: ascii(String(extractedData?.extraction_notes ?? ''), 200),
+      extraction_notes: ascii(String(extractedData?.notes ?? extractedData?.extraction_notes ?? ''), 200),
       processed_at: new Date().toISOString()
     }).eq('id', importId)
 
-    // Devolver solo metadatos minimos (evita FUNCTION_PAYLOAD_TOO_LARGE)
     return NextResponse.json({
       success: true,
       confidence,
       status,
-      sessionsFound: sessions.length
+      sessionsFound: sessions.length,
+      hasProgram,
+      hasProfile,
+      hasNutrition
     })
 
   } catch (e) {

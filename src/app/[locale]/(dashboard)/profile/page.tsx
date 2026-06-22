@@ -269,6 +269,72 @@ export default function ProfilePage() {
 
         {saveMsg && <p style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: ACC }}>{saveMsg}</p>}
 
+        {/* Nutricion */}
+        {(profile.nutrition_calories_target || profile.nutrition_protein_g || profile.training_split_detected || editing) && (
+          <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, overflow: 'hidden', ...animStyle(100) }}>
+            <div style={{ padding: '14px 20px 10px' }}>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3 }}>
+                {isEs ? 'Nutrición' : 'Nutrition'}
+              </p>
+            </div>
+            {editing ? (
+              <div style={{ padding: '4px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {[
+                    { key: 'nutrition_calories_target', label: isEs ? 'Calorías objetivo' : 'Target calories', ph: '2500', unit: 'kcal' },
+                    { key: 'nutrition_protein_g', label: isEs ? 'Proteínas (g)' : 'Protein (g)', ph: '180', unit: 'g' },
+                    { key: 'nutrition_carbs_g', label: isEs ? 'Carbohidratos (g)' : 'Carbs (g)', ph: '300', unit: 'g' },
+                    { key: 'nutrition_fat_g', label: isEs ? 'Grasas (g)' : 'Fat (g)', ph: '70', unit: 'g' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <label style={labelStyle}>{f.label}</label>
+                      <input type="number" value={form[f.key] ?? ''} onChange={e => setForm((prev: any) => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.ph}
+                        style={{ ...inputStyle, fontSize: 14, padding: '10px 14px' }} />
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <label style={labelStyle}>{isEs ? 'Comidas al día' : 'Meals per day'}</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[2, 3, 4, 5, 6].map(n => (
+                      <button key={n} onClick={() => setForm((prev: any) => ({ ...prev, nutrition_meals_per_day: n }))}
+                        style={{ flex: 1, padding: '8px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: form.nutrition_meals_per_day === n ? 'rgba(200,255,0,0.12)' : '#0d0d14', color: form.nutrition_meals_per_day === n ? ACC : T3, border: '1px solid ' + (form.nutrition_meals_per_day === n ? 'rgba(200,255,0,0.3)' : BORDER), fontFamily: 'DM Mono, monospace' }}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label style={labelStyle}>{isEs ? 'Notas nutricionales' : 'Nutrition notes'}</label>
+                  <textarea value={form.nutrition_notes ?? ''} onChange={e => setForm((prev: any) => ({ ...prev, nutrition_notes: e.target.value }))} rows={2}
+                    style={{ ...inputStyle, resize: 'none' as const, fontSize: 14, padding: '10px 14px' }} />
+                </div>
+              </div>
+            ) : (
+              <div>
+                {[
+                  { label: isEs ? 'Calorías' : 'Calories', value: profile.nutrition_calories_target ? `${profile.nutrition_calories_target} kcal` : null },
+                  { label: isEs ? 'Proteínas' : 'Protein', value: profile.nutrition_protein_g ? `${profile.nutrition_protein_g}g` : null },
+                  { label: isEs ? 'Carbohidratos' : 'Carbs', value: profile.nutrition_carbs_g ? `${profile.nutrition_carbs_g}g` : null },
+                  { label: isEs ? 'Grasas' : 'Fat', value: profile.nutrition_fat_g ? `${profile.nutrition_fat_g}g` : null },
+                  { label: isEs ? 'Comidas/día' : 'Meals/day', value: profile.nutrition_meals_per_day ? String(profile.nutrition_meals_per_day) : null },
+                  { label: isEs ? 'Split detectado' : 'Detected split', value: profile.training_split_detected ?? null },
+                ].filter(r => r.value).map(row => (
+                  <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 20px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: 13, color: T2 }}>{row.label}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: T1 }}>{row.value}</span>
+                  </div>
+                ))}
+                {!profile.nutrition_calories_target && !profile.nutrition_protein_g && (
+                  <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                    <p style={{ fontSize: 12, color: T3 }}>{isEs ? 'Sin datos nutricionales. Importa tu programa para autocompletar.' : 'No nutrition data. Import your program to auto-fill.'}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Registro Diario */}
         <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, overflow: 'hidden', ...animStyle(120) }}>
           <div style={{ padding: '14px 20px 14px' }}>

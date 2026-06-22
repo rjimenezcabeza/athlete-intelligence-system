@@ -1,23 +1,4 @@
 {
-  "nav": {
-    "dashboard": "Dashboard",
-    "training": "Trainen",
-    "history": "Geschiedenis",
-    "templates": "Sjablonen",
-    "exercises": "Oefeningen",
-    "import": "Importeren",
-    "coach": "AI Coach",
-    "settings": "Instellingen"
-  },
-  "auth": {
-    "login": "Inloggen",
-    "register": "Account aanmaken",
-    "logout": "Uitloggen",
-    "email": "E-mail",
-    "password": "Wachtwoord",
-    "noAccount": "Nog geen account?",
-    "haveAccount": "Al een account?"
-  },
   "training": {
     "startSession": "Sessie starten",
     "endSession": "Sessie beëindigen",
@@ -36,29 +17,6 @@
     "noTemplates": "Geen sjablonen. Maak er een om te beginnen.",
     "freeSession": "Vrije sessie"
   },
-  "exercises": {
-    "search": "Oefeningen zoeken",
-    "filter": "Filteren",
-    "allGroups": "Alle spiergroepen",
-    "chest": "Borst",
-    "back": "Rug",
-    "shoulders": "Schouders",
-    "biceps": "Biceps",
-    "triceps": "Triceps",
-    "legs": "Benen",
-    "glutes": "Billen",
-    "core": "Core",
-    "calves": "Kuiten",
-    "createExercise": "Oefening aanmaken"
-  },
-  "coach": {
-    "analyzing": "Geschiedenis analyseren...",
-    "recommendation": "Aanbeveling",
-    "accept": "Toepassen",
-    "modify": "Aanpassen",
-    "ignore": "Negeren",
-    "disclaimer": "AI-suggestie. Jij beslist."
-  },
   "progression": {
     "increaseWeight": "Gewicht verhogen",
     "increaseReps": "Herhalingen verhogen",
@@ -76,14 +34,27 @@
     "skip": "Overslaan",
     "noted": "Genoteerd"
   },
-  "volume": {
-    "weeklyVolume": "Weekelijks Volume",
-    "optimal": "Optimaal",
-    "belowMev": "Onder MEV",
-    "high": "Hoog",
-    "aboveMrv": "Boven MRV",
-    "sets": "sets",
-    "noData": "Geen data deze week"
+  "import": {
+    "title": "Programma importeren",
+    "subtitle": "Upload je trainingsprogramma en de AI analyseert het",
+    "dropzone": "Sleep je bestand hier",
+    "dropzoneOr": "of klik om te selecteren",
+    "formats": "PDF, afbeelding, Excel, Word of tekst",
+    "processing": "AI-analyse loopt...",
+    "processingDesc": "Oefeningen, voeding en sessies extraheren",
+    "reviewTitle": "Geextraheerde gegevens beoordelen",
+    "profileSection": "Atletenprofiel",
+    "nutritionSection": "Voeding",
+    "programSection": "Trainingsprogramma",
+    "sessionsSection": "Historische sessies",
+    "applySelected": "Selectie toepassen",
+    "confidence": "Nauwkeurigheid",
+    "done": "Import voltooid",
+    "error": "Importfout",
+    "retry": "Opnieuw proberen",
+    "cancel": "Annuleren",
+    "importAnother": "Ander importeren",
+    "viewProfile": "Profiel bekijken"
   },
   "common": {
     "save": "Opslaan",
@@ -97,6 +68,12 @@
     "back": "Terug",
     "next": "Volgende",
     "done": "Klaar"
+  },
+  "deload": {
+    "recommended": "Deloadweek aanbevolen",
+    "stallingDetected": "Stagnatie gedetecteerd",
+    "description": "Meerdere sessies zonder vooruitgang. Een deloadweek zal je herstel optimaliseren.",
+    "dismiss": "Negeren"
   },
   "mesocycle": {
     "active": "Actieve mesocyclus",
@@ -128,10 +105,67 @@
       "advanced": "Gevorderd"
     }
   },
-  "deload": {
-    "recommended": "Deloadweek aanbevolen",
-    "stallingDetected": "Stagnatie gedetecteerd",
-    "description": "Meerdere sessies zonder vooruitgang. Een deloadweek zal je herstel optimaliseren.",
-    "dismiss": "Negeren"
+  "nav": {
+    "dashboard": "Dashboard",
+    "training": "Trainen",
+    "history": "Geschiedenis",
+    "templates": "Sjablonen",
+    "exercises": "Oefeningen",
+    "import": "Importeren",
+    "coach": "AI Coach",
+    "settings": "Instellingen"
+  },
+  "nutrition": {
+    "title": "Voeding",
+    "calories": "Caloriedoel",
+    "protein": "Eiwit (g)",
+    "carbs": "Koolhydraten (g)",
+    "fat": "Vet (g)",
+    "meals": "Maaltijden per dag",
+    "notes": "Voedingsnotities",
+    "kcal": "kcal/dag",
+    "splitDetected": "Gedetecteerde split",
+    "importedFrom": "Automatisch geimporteerd"
+  },
+  "coach": {
+    "analyzing": "Geschiedenis analyseren...",
+    "recommendation": "Aanbeveling",
+    "accept": "Toepassen",
+    "modify": "Aanpassen",
+    "ignore": "Negeren",
+    "disclaimer": "AI-suggestie. Jij beslist."
+  },
+  "exercises": {
+    "search": "Oefeningen zoeken",
+    "filter": "Filteren",
+    "allGroups": "Alle spiergroepen",
+    "chest": "Borst",
+    "back": "Rug",
+    "shoulders": "Schouders",
+    "biceps": "Biceps",
+    "triceps": "Triceps",
+    "legs": "Benen",
+    "glutes": "Billen",
+    "core": "Core",
+    "calves": "Kuiten",
+    "createExercise": "Oefening aanmaken"
+  },
+  "volume": {
+    "weeklyVolume": "Weekelijks Volume",
+    "optimal": "Optimaal",
+    "belowMev": "Onder MEV",
+    "high": "Hoog",
+    "aboveMrv": "Boven MRV",
+    "sets": "sets",
+    "noData": "Geen data deze week"
+  },
+  "auth": {
+    "login": "Inloggen",
+    "register": "Account aanmaken",
+    "logout": "Uitloggen",
+    "email": "E-mail",
+    "password": "Wachtwoord",
+    "noAccount": "Nog geen account?",
+    "haveAccount": "Al een account?"
   }
 }
