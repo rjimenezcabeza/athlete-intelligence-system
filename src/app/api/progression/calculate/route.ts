@@ -2,150 +2,108 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-interface ProgressionRecommendation {
-  exercise_id: string
-  exercise_name: string
-  action_type: 'weight_increase' | 'rep_increase' | 'deload' | 'maintain' | 'set_increase'
-  prev_weight_kg: number | null
-  new_weight_kg: number | null
-  prev_reps_target: number | null
-  new_reps_target: number | null
-  reasoning_es: string
-  reasoning_en: string
-  confidence: 'high' | 'medium' | 'low'
+function calcDoubleProgression(
+  sets: Array<{ weightKg: number; repsCompleted: number; rirActual?: number }>,
+  repMin: number,
+  repMax: number,
+  increment: number
+) {
+  if (!sets.length) return null
+  const w = sets[0].weightKg
+  const allHitMax = sets.every(s => s.repsCompleted >= repMax)
+  const allAboveMin = sets.every(s => s.repsCompleted >= repMin)
+
+  if (allHitMax) {
+    return {
+      action: 'increase_weight',
+      newWeightKg: w + increment,
+      newRepsTarget: repMin,
+      reasoning_es: `Completaste todos los sets con ${repMax} reps. Sube a ${w + increment}kg esta semana.`,
+      reasoning_en: `You hit ${repMax} reps on all sets. Increase to ${w + increment}kg this week.`
+    }
+  }
+  if (!allAboveMin) {
+    return {
+      action: 'maintain_weight',
+      newWeightKg: w,
+      newRepsTarget: repMin,
+      reasoning_es: `Aun no llegas al rango minimo. Mantiene ${w}kg y mejora la tecnica.`,
+      reasoning_en: `Not yet hitting minimum reps. Keep ${w}kg and focus on technique.`
+    }
+  }
+  return {
+    action: 'increase_reps',
+    newWeightKg: w,
+    newRepsTarget: Math.min(Math.min(...sets.map(s => s.repsCompleted)) + 1, repMax),
+    reasoning_es: `Buen trabajo. Mantiene ${w}kg e intenta llegar a ${repMax} reps en todos los sets.`,
+    reasoning_en: `Good work. Keep ${w}kg and try to reach ${repMax} reps on all sets.`
+  }
 }
 
-// POST /api/progression/calculate
-// Body: { session_id: string }
-// Calcula progresión para todos los ejercicios de la sesión completada
 export async function POST(request: Request) {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-  )
+  try {
+    const body = await request.json()
+    const { exerciseId, sessionId, completedSets } = body
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!exerciseId || !completedSets?.length) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
 
-  const { data: profile } = await (supabase as any)
-    .from('athlete_profiles')
-    .select('id, language')
-    .eq('user_id', user.id)
-    .single()
-  if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+      (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+    )
 
-  const body = await request.json()
-  const { session_id } = body
-  if (!session_id) return NextResponse.json({ error: 'session_id required' }, { status: 400 })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 1. Obtener ejercicios de la sesión con sus sets
-  const { data: sessionExercises, error: seError } = await (supabase as any)
-    .from('session_exercises')
-    .select(`
-      id,
-      exercise_id,
-      exercises(id, name, slug, muscle_group_primary),
-      sets(
-        id, set_number, set_type, weight_kg, reps_completed, rir_actual, is_personal_record
-      )
-    `)
-    .eq('session_id', session_id)
-    .order('order_in_session')
-
-  if (seError || !sessionExercises) {
-    return NextResponse.json({ error: 'Session exercises not found' }, { status: 404 })
-  }
-
-  const recommendations: ProgressionRecommendation[] = []
-
-  for (const se of sessionExercises) {
-    const workingSets = (se.sets || []).filter((s: any) => s.set_type === 'working')
-    if (workingSets.length === 0) continue
-
-    const avgRir = workingSets.reduce((sum: number, s: any) => sum + (s.rir_actual || 0), 0) / workingSets.length
-    const maxWeight = Math.max(...workingSets.map((s: any) => s.weight_kg || 0))
-    const avgReps = workingSets.reduce((sum: number, s: any) => sum + (s.reps_completed || 0), 0) / workingSets.length
-    const setCount = workingSets.length
-
-    // Obtener historial del ejercicio
-    const { data: history } = await (supabase as any)
-      .from('exercise_history')
-      .select('*')
-      .eq('athlete_id', profile.id)
-      .eq('exercise_id', se.exercise_id)
+    const { data: profile } = await (supabase as any)
+      .from('athlete_profiles')
+      .select('id')
+      .eq('user_id', user.id)
       .single()
+    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-    // === LÓGICA: DOUBLE PROGRESSION (método por defecto) ===
-    let rec: ProgressionRecommendation | null = null
+    // Buscar configuracion del ejercicio en template activo
+    const { data: tmpl } = await (supabase as any)
+      .from('template_exercises')
+      .select('rep_range_min, rep_range_max, rir_target, progression_methods(config, method_type)')
+      .eq('exercise_id', exerciseId)
+      .maybeSingle()
 
-    if (avgRir <= 1.0 && setCount >= 2) {
-      const increment = maxWeight >= 60 ? 2.5 : 1.25
-      rec = {
-        exercise_id: se.exercise_id,
-        exercise_name: se.exercises?.name || '',
-        action_type: 'weight_increase',
-        prev_weight_kg: maxWeight,
-        new_weight_kg: maxWeight + increment,
-        prev_reps_target: Math.round(avgReps),
-        new_reps_target: Math.round(avgReps),
-        reasoning_es: `RIR promedio de ${avgRir.toFixed(1)} — tienes margen. Sube ${increment}kg la próxima sesión.`,
-        reasoning_en: `Avg RIR ${avgRir.toFixed(1)} — you have room. Add ${increment}kg next session.`,
-        confidence: avgRir === 0 ? 'high' : 'medium'
-      }
-    } else if (avgRir >= 3.5) {
-      rec = {
-        exercise_id: se.exercise_id,
-        exercise_name: se.exercises?.name || '',
-        action_type: 'maintain',
-        prev_weight_kg: maxWeight,
-        new_weight_kg: maxWeight,
-        prev_reps_target: Math.round(avgReps),
-        new_reps_target: Math.round(avgReps) + 1,
-        reasoning_es: `RIR alto (${avgRir.toFixed(1)}). Mantén el peso e intenta añadir una rep antes de subir carga.`,
-        reasoning_en: `High RIR (${avgRir.toFixed(1)}). Keep weight and try adding a rep before increasing load.`,
-        confidence: 'low'
-      }
-    } else {
-      rec = {
-        exercise_id: se.exercise_id,
-        exercise_name: se.exercises?.name || '',
-        action_type: 'maintain',
-        prev_weight_kg: maxWeight,
-        new_weight_kg: maxWeight,
-        prev_reps_target: Math.round(avgReps),
-        new_reps_target: Math.round(avgReps),
-        reasoning_es: `RIR ideal (${avgRir.toFixed(1)}). Mantén carga y reps. Consistencia = progresión.`,
-        reasoning_en: `Ideal RIR (${avgRir.toFixed(1)}). Maintain load and reps. Consistency = progression.`,
-        confidence: 'high'
-      }
-    }
+    const cfg = tmpl?.progression_methods?.config || {}
+    const repMin = tmpl?.rep_range_min || cfg.rep_range_min || 8
+    const repMax = tmpl?.rep_range_max || cfg.rep_range_max || 12
+    const increment = cfg.weight_increment_kg || 2.5
 
-    if (rec) {
-      await (supabase as any)
-        .from('progression_log')
-        .insert({
-          athlete_id: profile.id,
-          exercise_id: se.exercise_id,
-          session_id,
-          action_type: rec.action_type,
-          prev_weight_kg: rec.prev_weight_kg,
-          new_weight_kg: rec.new_weight_kg,
-          prev_reps_target: rec.prev_reps_target,
-          new_reps_target: rec.new_reps_target,
-          reasoning_es: rec.reasoning_es,
-          reasoning_en: rec.reasoning_en,
-          trigger_data: { avg_rir: avgRir, set_count: setCount, avg_reps: avgReps }
-        })
+    const workingSets = completedSets.filter((s: any) => s.setType === 'working' && s.weightKg && s.repsCompleted)
+    if (!workingSets.length) return NextResponse.json({ suggestion: null })
 
-      recommendations.push(rec)
-    }
+    const suggestion = calcDoubleProgression(workingSets, repMin, repMax, increment)
+    if (!suggestion) return NextResponse.json({ suggestion: null })
+
+    await (supabase as any)
+      .from('progression_log')
+      .insert({
+        athlete_id: profile.id,
+        exercise_id: exerciseId,
+        session_id: sessionId || null,
+        action_type: suggestion.action,
+        prev_weight_kg: workingSets[0].weightKg,
+        prev_reps_target: workingSets[0].repsCompleted,
+        new_weight_kg: suggestion.newWeightKg,
+        new_reps_target: suggestion.newRepsTarget,
+        reasoning_es: suggestion.reasoning_es,
+        reasoning_en: suggestion.reasoning_en,
+        trigger_data: { workingSets: workingSets.length, repMin, repMax },
+        applied: false
+      })
+
+    return NextResponse.json({ suggestion })
+  } catch (error) {
+    console.error('[progression/calculate]', error)
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
-
-  return NextResponse.json({
-    success: true,
-    session_id,
-    recommendations
-  })
 }

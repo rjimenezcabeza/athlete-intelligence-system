@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSessionStore } from '@/stores/session.store'
 import { SetLogger, CompletedSet } from './SetLogger'
+import { LastPerformanceBadge } from '@/components/workout/LastPerformanceBadge'
 
 interface ActiveSessionProps { sessionId: string; locale: string }
 interface ExResult { id: string; name: string; muscle_group_primary: string; slug: string }
@@ -205,6 +206,9 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
                 {cur.muscle_group_primary}
               </span>
             </div>
+
+            {/* Rendimiento anterior */}
+            <LastPerformanceBadge exerciseId={cur.id} locale={locale} />
 
             {/* Series completadas */}
             {cur.sets.map((set, i) => (

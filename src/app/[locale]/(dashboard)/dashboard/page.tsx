@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { MuscleVolumeChart } from '@/components/dashboard/MuscleVolumeChart'
 
 const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
@@ -127,6 +128,11 @@ export default function DashboardPage() {
             <p style={{ fontSize: 13, color: T3 }}>{isEs ? 'Completa sesiones para ver el gráfico de volumen' : 'Complete sessions to see the volume chart'}</p>
           </div>
         )}
+
+        {/* Volumen por musculo */}
+        <div className="fade-in s3">
+          <MuscleVolumeChart locale={locale} />
+        </div>
 
         {/* Feedback Promedio */}
         {!loading && feedbackBars && (
