@@ -33,11 +33,19 @@ export async function GET() {
 
     const aid = profile.id
 
-    const { data: sessions } = await (admin as any)
-      .from('training_sessions')
-      .select('id, session_date, duration_minutes, pump_rating, local_fatigue, perceived_recovery, rir_session_avg, status')
-      .eq('athlete_id', aid).eq('status', 'completed')
-      .order('session_date', { ascending: false }).limit(30)
+    const [sessionsRes, countRes] = await Promise.all([
+      (admin as any)
+        .from('training_sessions')
+        .select('id, session_date, duration_minutes, pump_rating, local_fatigue, perceived_recovery, rir_session_avg, status')
+        .eq('athlete_id', aid).eq('status', 'completed')
+        .order('session_date', { ascending: false }).limit(30),
+      (admin as any)
+        .from('training_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('athlete_id', aid).eq('status', 'completed')
+    ])
+    const sessions = sessionsRes.data
+    const totalSessionsCount = countRes.count ?? 0
 
     let streak = 0
     if (sessions && sessions.length > 0) {
@@ -100,7 +108,7 @@ export async function GET() {
       recommendations: recommendations || [],
       recentSessions: (sessions || []).slice(0, 7),
       stats: {
-        totalSessions: (sessions || []).length,
+        totalSessions: totalSessionsCount,
         streak,
         avgDuration: sessions?.length
           ? Math.round(sessions.reduce((s: number, x: any) => s + (x.duration_minutes ?? 0), 0) / sessions.length)

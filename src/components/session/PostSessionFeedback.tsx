@@ -73,7 +73,7 @@ export default function PostSessionFeedback({ sessionId, locale }: Props) {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error saving feedback')
       resetFeedback()
-      router.push(`/${locale}/dashboard`)
+      router.push(`/${locale}/dashboard?completed=true`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error guardando feedback'
       setError(msg)

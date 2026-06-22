@@ -24,10 +24,10 @@ export async function GET() {
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     const { data } = await (admin as any)
       .from('training_sessions')
-      .select('id, session_date, duration_minutes, pump_rating, local_fatigue, perceived_recovery, status')
+      .select('id, session_date, duration_minutes, pump_rating, local_fatigue, perceived_recovery, status, day_label')
       .eq('athlete_id', profile.id)
       .order('session_date', { ascending: false })
-      .limit(50)
+      .limit(100)
     return NextResponse.json({ sessions: data ?? [] })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

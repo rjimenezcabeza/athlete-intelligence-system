@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import PostSessionFeedback from '@/components/session/PostSessionFeedback'
@@ -13,40 +14,31 @@ interface Props {
 export default async function FeedbackPage({ params }: Props) {
   const { locale, id } = await params
 
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
+  const svc = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+
   const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {}
-        },
-      },
-    }
-  )
+  const supabase = createServerClient(url, svc, {
+    cookies: {
+      getAll() { return cookieStore.getAll() },
+      setAll() {},
+    },
+  })
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    redirect(`/${locale}/login`)
-  }
+  if (!user) redirect(`/${locale}/login`)
 
-  const { data: profile } = await (supabase as any)
+  const admin = createClient(url, svc, { auth: { autoRefreshToken: false, persistSession: false } })
+
+  const { data: profile } = await (admin as any)
     .from('athlete_profiles')
     .select('id')
     .eq('user_id', user.id)
     .single()
 
-  if (!profile) {
-    redirect(`/${locale}/dashboard`)
-  }
+  if (!profile) redirect(`/${locale}/dashboard`)
 
-  const { data: session } = await (supabase as any)
+  const { data: session } = await (admin as any)
     .from('training_sessions')
     .select('id, status')
     .eq('id', id)

@@ -30,13 +30,17 @@ export async function GET(req: NextRequest) {
     const q = req.nextUrl.searchParams.get('q') ?? ''
     const admin = adminDb()
 
-    const { data } = await (admin as any)
+    let query = (admin as any)
       .from('exercises')
       .select('id, name, muscle_group_primary, equipment, slug')
-      .or(q.length > 0 ? 'name.ilike.%' + q + '%' : 'is_global.eq.true')
       .eq('is_global', true)
       .order('name')
-      .limit(30)
+
+    if (q.length > 0) {
+      query = query.ilike('name', '%' + q + '%')
+    }
+
+    const { data } = await query.limit(200)
 
     return NextResponse.json({ exercises: data ?? [] })
   } catch (e) {
