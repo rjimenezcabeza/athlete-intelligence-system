@@ -114,5 +114,24 @@
     "duration": "Duracion (semanas)",
     "createBtn": "Crear bloque",
     "cancel": "Cancelar"
+  },
+  "templates": {
+    "preset": "Rutinas Predefinidas",
+    "selectSubtitle": "Selecciona una rutina para empezar tu bloque",
+    "daysPerWeek": "dias/semana",
+    "weeksCount": "semanas",
+    "useRoutine": "Usar esta rutina",
+    "allDays": "Todos",
+    "difficulty": {
+      "beginner": "Principiante",
+      "intermediate": "Intermedio",
+      "advanced": "Avanzado"
+    }
+  },
+  "deload": {
+    "recommended": "Semana de Descarga Recomendada",
+    "stallingDetected": "Estancamiento Detectado",
+    "description": "Tu cuerpo lleva varias sesiones sin progresar. Una semana de descarga optimizara tu recuperacion.",
+    "dismiss": "Ignorar"
   }
 }

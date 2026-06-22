@@ -114,5 +114,24 @@
     "duration": "Duree (semaines)",
     "createBtn": "Creer le bloc",
     "cancel": "Annuler"
+  },
+  "templates": {
+    "preset": "Routines predefinies",
+    "selectSubtitle": "Selectionnez une routine",
+    "daysPerWeek": "jours/sem",
+    "weeksCount": "semaines",
+    "useRoutine": "Utiliser",
+    "allDays": "Tous",
+    "difficulty": {
+      "beginner": "Debutant",
+      "intermediate": "Intermediaire",
+      "advanced": "Avance"
+    }
+  },
+  "deload": {
+    "recommended": "Semaine de decharge recommandee",
+    "stallingDetected": "Stagnation detectee",
+    "description": "Plusieurs seances sans progres. Une semaine de decharge optimisera votre recuperation.",
+    "dismiss": "Ignorer"
   }
 }

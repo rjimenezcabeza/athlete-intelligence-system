@@ -114,5 +114,24 @@
     "duration": "Duration (weeks)",
     "createBtn": "Create block",
     "cancel": "Cancel"
+  },
+  "templates": {
+    "preset": "Preset Routines",
+    "selectSubtitle": "Select a routine to start your training block",
+    "daysPerWeek": "days/week",
+    "weeksCount": "weeks",
+    "useRoutine": "Use this routine",
+    "allDays": "All",
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    }
+  },
+  "deload": {
+    "recommended": "Deload Week Recommended",
+    "stallingDetected": "Stalling Detected",
+    "description": "Several sessions without progress detected. A deload week will optimize your recovery.",
+    "dismiss": "Dismiss"
   }
 }

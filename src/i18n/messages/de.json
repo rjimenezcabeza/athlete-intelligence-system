@@ -114,5 +114,24 @@
     "duration": "Dauer (Wochen)",
     "createBtn": "Block erstellen",
     "cancel": "Abbrechen"
+  },
+  "templates": {
+    "preset": "Vordefinierte Routinen",
+    "selectSubtitle": "Routine auswahlen",
+    "daysPerWeek": "Tage/Wo",
+    "weeksCount": "Wochen",
+    "useRoutine": "Verwenden",
+    "allDays": "Alle",
+    "difficulty": {
+      "beginner": "Anfanger",
+      "intermediate": "Mittelstufe",
+      "advanced": "Fortgeschritten"
+    }
+  },
+  "deload": {
+    "recommended": "Deload-Woche empfohlen",
+    "stallingDetected": "Stagnation erkannt",
+    "description": "Mehrere Einheiten ohne Fortschritt. Eine Deload-Woche wird Ihre Erholung optimieren.",
+    "dismiss": "Ignorieren"
   }
 }

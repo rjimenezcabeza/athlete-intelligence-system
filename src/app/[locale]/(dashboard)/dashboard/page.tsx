@@ -6,6 +6,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { MuscleVolumeChart } from '@/components/dashboard/MuscleVolumeChart'
 import { MesocycleWidget } from '@/components/dashboard/MesocycleWidget'
 import { MesocycleCreateModal } from '@/components/dashboard/MesocycleCreateModal'
+import { DeloadAlert } from '@/components/dashboard/DeloadAlert'
 
 const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
@@ -65,6 +66,9 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+        {/* Deload alert — solo visible cuando hay estancamiento */}
+        <DeloadAlert locale={locale} />
 
         {/* KPI Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

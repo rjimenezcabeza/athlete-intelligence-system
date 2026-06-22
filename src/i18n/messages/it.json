@@ -114,5 +114,24 @@
     "duration": "Durata (settimane)",
     "createBtn": "Crea blocco",
     "cancel": "Annulla"
+  },
+  "templates": {
+    "preset": "Routine predefinite",
+    "selectSubtitle": "Seleziona una routine",
+    "daysPerWeek": "giorni/sett",
+    "weeksCount": "settimane",
+    "useRoutine": "Usa questa",
+    "allDays": "Tutti",
+    "difficulty": {
+      "beginner": "Principiante",
+      "intermediate": "Intermedio",
+      "advanced": "Avanzato"
+    }
+  },
+  "deload": {
+    "recommended": "Settimana di scarico raccomandata",
+    "stallingDetected": "Stallo rilevato",
+    "description": "Piu sessioni senza progressi. Una settimana di scarico ottimizzera il tuo recupero.",
+    "dismiss": "Ignora"
   }
 }

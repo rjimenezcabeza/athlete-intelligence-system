@@ -21,15 +21,25 @@ export async function GET() {
       .single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-    const { data: templates } = await (supabase as any)
+    const { data: ownTemplates } = await (supabase as any)
       .from('training_templates')
-      .select('id, name, training_days_per_week, split_type, mesocycle_weeks, is_active')
+      .select('id, name, description, training_days_per_week, split_type, mesocycle_weeks, is_active, difficulty_level, split_description, target_muscle_groups')
       .eq('athlete_id', profile.id)
       .eq('is_active', true)
       .eq('is_archived', false)
       .order('created_at', { ascending: false })
 
-    return NextResponse.json({ templates: templates || [] })
+    const { data: systemTemplates } = await (supabase as any)
+      .from('training_templates')
+      .select('id, name, description, training_days_per_week, split_type, mesocycle_weeks, difficulty_level, split_description, target_muscle_groups')
+      .eq('is_system', true)
+      .eq('is_active', true)
+      .order('training_days_per_week', { ascending: true })
+
+    return NextResponse.json({
+      templates: ownTemplates || [],
+      systemTemplates: systemTemplates || []
+    })
   } catch (error) {
     console.error('[templates]', error)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })

@@ -114,5 +114,24 @@
     "duration": "Duur (weken)",
     "createBtn": "Blok aanmaken",
     "cancel": "Annuleren"
+  },
+  "templates": {
+    "preset": "Vooraf ingestelde routines",
+    "selectSubtitle": "Selecteer een routine",
+    "daysPerWeek": "dagen/week",
+    "weeksCount": "weken",
+    "useRoutine": "Gebruik deze",
+    "allDays": "Alle",
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Gemiddeld",
+      "advanced": "Gevorderd"
+    }
+  },
+  "deload": {
+    "recommended": "Deloadweek aanbevolen",
+    "stallingDetected": "Stagnatie gedetecteerd",
+    "description": "Meerdere sessies zonder vooruitgang. Een deloadweek zal je herstel optimaliseren.",
+    "dismiss": "Negeren"
   }
 }
