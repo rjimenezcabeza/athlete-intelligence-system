@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+
+const BG = '#0A0A0F'
+const CARD = '#111118'
+const ACC = '#C8FF00'
+const T1 = '#F0F0F5'
+const T2 = '#8888AA'
+const T3 = '#44445a'
+const BORDER = 'rgba(255,255,255,0.06)'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -8,143 +16,246 @@ interface Message {
   timestamp: Date
 }
 
+interface CoachContext {
+  dataCompleteness: {
+    hasProfile: boolean
+    hasNutrition: boolean
+    hasSessions: boolean
+    hasMesocycle: boolean
+    hasVolumeHistory: boolean
+    hasProgressionHistory: boolean
+    score: number
+  }
+}
+
 interface CoachChatProps {
   language?: string
   isPro?: boolean
 }
 
-const SUGGESTED_QUESTIONS_ES = [
-  '¿Cómo está mi progresión este mes?',
-  '¿Debería hacer deload pronto?',
-  '¿Cuál es mi ejercicio con más potencial?',
-  '¿Cómo mejorar mi recuperación?',
-]
+function ContextPanel({ context, isEs }: { context: CoachContext; isEs: boolean }) {
+  const dc = context.dataCompleteness
+  const items = [
+    { key: 'hasSessions' as const, label: isEs ? 'Sesiones' : 'Sessions' },
+    { key: 'hasProfile' as const, label: isEs ? 'Perfil' : 'Profile' },
+    { key: 'hasNutrition' as const, label: isEs ? 'Nutricion' : 'Nutrition' },
+    { key: 'hasMesocycle' as const, label: isEs ? 'Mesociclo' : 'Mesocycle' },
+    { key: 'hasProgressionHistory' as const, label: isEs ? 'Progresion' : 'Progression' },
+  ]
 
-const SUGGESTED_QUESTIONS_EN = [
-  'How is my progression this month?',
-  'Should I deload soon?',
-  'Which exercise has the most potential?',
-  'How to improve my recovery?',
-]
+  return (
+    <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid ' + BORDER, borderRadius: '12px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <span style={{ fontSize: '10px', color: T3, fontFamily: 'DM Mono, monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          {isEs ? 'Contexto del Coach' : 'Coach Context'}
+        </span>
+        <span style={{ fontSize: '11px', color: dc.score > 60 ? ACC : '#FF9800', fontFamily: 'DM Mono, monospace', fontWeight: '700' }}>
+          {dc.score}% {isEs ? 'datos' : 'data'}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+        {items.map(item => (
+          <span
+            key={item.key}
+            style={{
+              padding: '2px 7px',
+              borderRadius: '4px',
+              fontSize: '10px',
+              fontFamily: 'DM Mono, monospace',
+              background: dc[item.key] ? 'rgba(200,255,0,0.08)' : 'rgba(255,255,255,0.03)',
+              color: dc[item.key] ? ACC : T3,
+              border: `1px solid ${dc[item.key] ? 'rgba(200,255,0,0.15)' : 'rgba(255,255,255,0.06)'}`,
+            }}
+          >
+            {dc[item.key] ? '✓' : '○'} {item.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function CoachChat({ language = 'es', isPro = false }: CoachChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [context, setContext] = useState<CoachContext | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  const t = {
-    placeholder: language === 'en' ? 'Ask your coach...' : 'Pregunta a tu coach...',
-    thinking: language === 'en' ? 'Analyzing your data...' : 'Analizando tus datos...',
-    pro_required: language === 'en'
-      ? 'AI Coach is available for Pro members. Upgrade to unlock personalized coaching.'
-      : 'El AI Coach está disponible para miembros Pro. Actualiza para desbloquear coaching personalizado.',
-    upgrade: language === 'en' ? 'Upgrade to Pro' : 'Actualizar a Pro',
-    welcome: language === 'en'
-      ? 'Hi! I\'m your AI Coach. I have access to your complete training history. What would you like to know?'
-      : '¡Hola! Soy tu AI Coach. Tengo acceso a tu historial completo de entrenamiento. ¿Qué quieres saber?',
-  }
+  const initDoneRef = useRef(false)
+  const isEs = language === 'es'
 
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([{
-        role: 'assistant',
-        content: t.welcome,
-        timestamp: new Date()
-      }])
-    }
+    fetch('/api/coach/context')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setContext(data) })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || loading) return
+  const streamMessage = useCallback(async (text: string, autoInitiated = false) => {
+    if (loading) return
 
-    const userMessage: Message = { role: 'user', content: text, timestamp: new Date() }
-    const newMessages = [...messages, userMessage]
-    setMessages(newMessages)
+    if (!autoInitiated) {
+      setMessages(prev => [...prev, { role: 'user', content: text, timestamp: new Date() }])
+    }
     setInput('')
     setLoading(true)
 
+    setMessages(prev => [...prev, { role: 'assistant', content: '', timestamp: new Date() }])
+
     try {
-      const conversationHistory = newMessages
-        .slice(1) // skip welcome message
+      const history = autoInitiated ? [] : messages
+        .filter(m => m.content)
         .slice(-6)
         .map(m => ({ role: m.role, content: m.content }))
 
       const res = await fetch('/api/coach/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          conversation_history: conversationHistory.slice(0, -1)
-        })
+        body: JSON.stringify({ message: text, conversation_history: history })
       })
 
-      const data = await res.json()
+      if (!res.body) throw new Error('No stream')
 
-      if (data.response) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: data.response,
-          timestamp: new Date()
-        }])
-      } else {
-        throw new Error(data.error || 'Unknown error')
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullText = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const raw = line.slice(6).trim()
+          if (raw === '[DONE]') continue
+          try {
+            const { text: chunk } = JSON.parse(raw)
+            fullText += chunk
+            const snapshot = fullText
+            setMessages(prev => {
+              const copy = [...prev]
+              copy[copy.length - 1] = { role: 'assistant', content: snapshot, timestamp: new Date() }
+              return copy
+            })
+          } catch {}
+        }
       }
     } catch (error: any) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: language === 'en'
-          ? `Sorry, I had an error: ${error.message}. Try again.`
-          : `Lo siento, tuve un error: ${error.message}. Inténtalo de nuevo.`,
-        timestamp: new Date()
-      }])
+      const errMsg = isEs
+        ? `Error al contactar al Coach. Intenta de nuevo.`
+        : `Error contacting the Coach. Please try again.`
+      setMessages(prev => {
+        const copy = [...prev]
+        copy[copy.length - 1] = { role: 'assistant', content: errMsg, timestamp: new Date() }
+        return copy
+      })
     } finally {
       setLoading(false)
     }
-  }
+  }, [loading, messages, isEs])
 
-  const suggestedQuestions = language === 'en' ? SUGGESTED_QUESTIONS_EN : SUGGESTED_QUESTIONS_ES
+  useEffect(() => {
+    if (!context || initDoneRef.current) return
+    initDoneRef.current = true
+    const score = context.dataCompleteness?.score ?? 0
+    const initMsg = score > 30
+      ? (isEs
+          ? 'Analiza mi estado de entrenamiento actual y dame tu evaluacion detallada'
+          : 'Analyze my current training status and give me your detailed assessment')
+      : (isEs
+          ? 'Presentate y ayudame a empezar con AIS'
+          : 'Introduce yourself and help me get started with AIS')
+    streamMessage(initMsg, true)
+  }, [context])
+
+  const suggestedQuestions = isEs
+    ? ['¿Cómo está mi progresión este mes?', '¿Debería hacer deload pronto?', '¿Cuál es mi ejercicio con más potencial?', '¿Cómo mejorar mi recuperación?']
+    : ['How is my progression this month?', 'Should I deload soon?', 'Which exercise has the most potential?', 'How to improve my recovery?']
 
   if (!isPro) {
     return (
-      <div className="rounded-2xl border border-[#C8FF00]/20 bg-[#C8FF00]/5 p-6 text-center">
-        <div className="text-4xl mb-3">🤖</div>
-        <p className="text-white/70 text-sm mb-4">{t.pro_required}</p>
-        <button className="px-6 py-3 rounded-xl bg-[#C8FF00] text-black font-bold text-sm hover:bg-[#b8ef00] transition-colors">
-          {t.upgrade}
+      <div style={{ borderRadius: '16px', border: '1px solid rgba(200,255,0,0.15)', background: 'rgba(200,255,0,0.04)', padding: '28px', textAlign: 'center' }}>
+        <div style={{ fontSize: '40px', marginBottom: '12px' }}>🤖</div>
+        <p style={{ color: T2, fontSize: '14px', marginBottom: '20px', fontFamily: 'Inter, sans-serif', lineHeight: '1.5' }}>
+          {isEs
+            ? 'El AI Coach está disponible para miembros Pro. Actualiza para desbloquear coaching personalizado.'
+            : 'AI Coach is available for Pro members. Upgrade to unlock personalized coaching.'}
+        </p>
+        <button style={{ padding: '12px 28px', borderRadius: '12px', background: ACC, color: BG, border: 'none', fontSize: '14px', fontWeight: '700', fontFamily: 'Syne, sans-serif', cursor: 'pointer' }}>
+          {isEs ? 'Actualizar a Pro' : 'Upgrade to Pro'}
         </button>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* Context panel */}
+      {context && <ContextPanel context={context} isEs={isEs} />}
+
+      {/* Initializing skeleton */}
+      {!context && (
+        <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid ' + BORDER, borderRadius: '12px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: ACC, animation: 'pulse 1s ease-in-out infinite' }} />
+          <span style={{ fontSize: '11px', color: T3, fontFamily: 'DM Mono, monospace' }}>
+            {isEs ? 'Cargando contexto del atleta...' : 'Loading athlete context...'}
+          </span>
+        </div>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-3 pb-4 min-h-0" style={{ maxHeight: '400px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '8px', minHeight: 0, maxHeight: '420px' }}>
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-              msg.role === 'user'
-                ? 'bg-[#C8FF00] text-black font-medium rounded-br-sm'
-                : 'bg-white/[0.06] text-white/90 border border-white/10 rounded-bl-sm'
-            }`}>
-              {msg.content}
+          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div style={{
+              maxWidth: '85%',
+              borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+              padding: '10px 14px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              fontFamily: 'Inter, sans-serif',
+              background: msg.role === 'user' ? ACC : 'rgba(255,255,255,0.06)',
+              color: msg.role === 'user' ? BG : T1,
+              fontWeight: msg.role === 'user' ? '500' : '400',
+              border: msg.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.08)',
+              whiteSpace: 'pre-wrap'
+            }}>
+              {msg.content || (msg.role === 'assistant' && loading && i === messages.length - 1 ? (
+                <span style={{ color: T2, fontSize: '12px' }}>
+                  {isEs ? 'Analizando tu historial...' : 'Analyzing your history...'}
+                </span>
+              ) : null)}
+              {!msg.content && msg.role === 'assistant' && loading && i === messages.length - 1 && (
+                <span style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: ACC, display: 'inline-block', animation: 'bounce 0.8s ease-in-out infinite' }} />
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: ACC, display: 'inline-block', animation: 'bounce 0.8s ease-in-out 0.15s infinite' }} />
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: ACC, display: 'inline-block', animation: 'bounce 0.8s ease-in-out 0.3s infinite' }} />
+                </span>
+              )}
             </div>
           </div>
         ))}
 
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-white/[0.06] border border-white/10 rounded-2xl rounded-bl-sm px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-[#C8FF00] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1.5 h-1.5 bg-[#C8FF00] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-1.5 h-1.5 bg-[#C8FF00] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                <span className="text-white/30 text-xs ml-1">{t.thinking}</span>
+        {loading && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && !messages[messages.length - 1].content && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px 18px 18px 4px', padding: '12px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: ACC, display: 'block', animation: 'bounce 0.8s ease-in-out infinite' }} />
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: ACC, display: 'block', animation: 'bounce 0.8s ease-in-out 0.15s infinite' }} />
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: ACC, display: 'block', animation: 'bounce 0.8s ease-in-out 0.3s infinite' }} />
+                <span style={{ color: T3, fontSize: '11px', marginLeft: '4px', fontFamily: 'DM Mono, monospace' }}>
+                  {isEs ? 'Analizando...' : 'Analyzing...'}
+                </span>
               </div>
             </div>
           </div>
@@ -153,14 +264,26 @@ export function CoachChat({ language = 'es', isPro = false }: CoachChatProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested questions */}
-      {messages.filter(m => m.role === 'user').length === 0 && (
-        <div className="flex flex-wrap gap-2 pb-3">
+      {/* Suggested questions — shown before any user message */}
+      {messages.filter(m => m.role === 'user').length === 0 && !loading && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingBottom: '10px' }}>
           {suggestedQuestions.map((q, i) => (
             <button
               key={i}
-              onClick={() => sendMessage(q)}
-              className="text-xs px-3 py-1.5 rounded-full border border-white/15 text-white/60 hover:border-[#C8FF00]/40 hover:text-[#C8FF00] transition-colors"
+              onClick={() => streamMessage(q)}
+              style={{
+                fontSize: '12px',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'transparent',
+                color: T2,
+                cursor: 'pointer',
+                fontFamily: 'Inter, sans-serif',
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,255,0,0.35)'; e.currentTarget.style.color = ACC }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = T2 }}
             >
               {q}
             </button>
@@ -169,27 +292,55 @@ export function CoachChat({ language = 'es', isPro = false }: CoachChatProps) {
       )}
 
       {/* Input */}
-      <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '10px', borderTop: '1px solid ' + BORDER }}>
         <input
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
-          placeholder={t.placeholder}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !loading && streamMessage(input)}
+          placeholder={isEs ? 'Pregunta algo sobre tu entrenamiento...' : 'Ask something about your training...'}
           disabled={loading}
-          className="flex-1 bg-white/[0.05] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#C8FF00]/40 disabled:opacity-50"
-          style={{ fontFamily: 'Inter, sans-serif' }}
+          style={{
+            flex: 1,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            fontSize: '14px',
+            color: T1,
+            fontFamily: 'Inter, sans-serif',
+            outline: 'none',
+            opacity: loading ? 0.5 : 1
+          }}
         />
         <button
-          onClick={() => sendMessage(input)}
+          onClick={() => streamMessage(input)}
           disabled={loading || !input.trim()}
-          className="w-10 h-10 rounded-xl bg-[#C8FF00] text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#b8ef00] transition-colors flex-shrink-0"
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '12px',
+            background: ACC,
+            color: BG,
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+            opacity: loading || !input.trim() ? 0.3 : 1,
+            flexShrink: 0
+          }}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M14 8L2 2L5 8L2 14L14 8Z" fill="currentColor"/>
           </svg>
         </button>
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+        @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+      ` }} />
     </div>
   )
 }
