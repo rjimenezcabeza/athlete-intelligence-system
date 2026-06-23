@@ -184,5 +184,20 @@
     "password": "Passwort",
     "noAccount": "Noch kein Konto?",
     "haveAccount": "Bereits ein Konto?"
+  },
+  "wearables": {
+    "title": "Wearables",
+    "subtitle": "Verbinde deine Geräte für Erholungsdaten im Coach",
+    "connect": "Verbinden",
+    "connected": "Verbunden",
+    "disconnect": "Trennen",
+    "sync": "Synchronisieren",
+    "lastSync": "Letzte Sync",
+    "pending": "Ausstehend",
+    "comingSoon": "Demnächst",
+    "coachNote": "Mit verbundenen Wearables bezieht der KI-Coach deine Erholungsdaten in seine Analysen ein.",
+    "stravaDesc": "Synchronisiert Aktivitäten, Herzfrequenz und wahrgenommene Anstrengung",
+    "garminDesc": "Body Battery, HRV und erweiterte Erholungsmetriken",
+    "polarDesc": "Trainingsbelastung und Erholungsstatus"
   }
 }

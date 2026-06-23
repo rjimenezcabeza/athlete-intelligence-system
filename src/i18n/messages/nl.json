@@ -184,5 +184,20 @@
     "password": "Wachtwoord",
     "noAccount": "Nog geen account?",
     "haveAccount": "Al een account?"
+  },
+  "wearables": {
+    "title": "Wearables",
+    "subtitle": "Verbind je apparaten voor hersteldata in de Coach",
+    "connect": "Verbinden",
+    "connected": "Verbonden",
+    "disconnect": "Verbreken",
+    "sync": "Synchroniseren",
+    "lastSync": "Laatste sync",
+    "pending": "In behandeling",
+    "comingSoon": "Binnenkort",
+    "coachNote": "Met verbonden wearables neemt de AI Coach je hersteldata mee in zijn analyses.",
+    "stravaDesc": "Synchroniseert activiteiten, hartslag en ervaren inspanning",
+    "garminDesc": "Body Battery, HRV en geavanceerde herstelmetrieken",
+    "polarDesc": "Trainingsbelasting en herstelstatus"
   }
 }

@@ -32,7 +32,8 @@ export async function GET() {
       mesocycleResult,
       patternsResult,
       stallingResult,
-      recentPRsResult
+      recentPRsResult,
+      wearableResult
     ] = await Promise.all([
       (supabase as any)
         .from('training_sessions')
@@ -103,7 +104,13 @@ export async function GET() {
         .eq('is_personal_record', true)
         .eq('set_type', 'working')
         .gte('logged_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-        .limit(10)
+        .limit(10),
+
+      (supabase as any)
+        .from('wearable_connections')
+        .select('provider, last_sync_at, provider_data, is_active')
+        .eq('athlete_id', athleteId)
+        .eq('is_active', true)
     ])
 
     const sessions = sessionsResult.data || []
@@ -114,6 +121,8 @@ export async function GET() {
     const patterns = patternsResult.data || []
     const stallingRaw = stallingResult.data || []
     const recentPRsRaw = recentPRsResult.data || []
+    const wearableData = wearableResult?.data || []
+    const stravaConn = wearableData.find((w: any) => w.provider === 'strava')
 
     const stallingCount: Record<string, { name: string; muscle: string; count: number }> = {}
     for (const log of stallingRaw) {
@@ -234,6 +243,14 @@ export async function GET() {
       })),
       patterns,
       recentPRs,
+      wearables: {
+        connected: wearableData.map((w: any) => w.provider),
+        strava: stravaConn ? {
+          lastSync: stravaConn.last_sync_at,
+          recentActivities: stravaConn.provider_data?.recentActivities?.slice(0, 5) || [],
+          totalActivities: stravaConn.provider_data?.totalActivities || 0
+        } : null
+      },
       dataCompleteness: {
         hasProfile: !!(profile.body_weight_kg || profile.training_experience_years),
         hasNutrition: !!(profile.nutrition_calories_target),

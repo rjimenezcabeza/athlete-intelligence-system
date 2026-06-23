@@ -184,5 +184,20 @@
     "password": "Contraseña",
     "noAccount": "¿No tienes cuenta?",
     "haveAccount": "¿Ya tienes cuenta?"
+  },
+  "wearables": {
+    "title": "Wearables",
+    "subtitle": "Conecta tus dispositivos para datos de recuperacion en el Coach",
+    "connect": "Conectar",
+    "connected": "Conectado",
+    "disconnect": "Desconectar",
+    "sync": "Sincronizar",
+    "lastSync": "Ultima sync",
+    "pending": "Pendiente",
+    "comingSoon": "Proximo",
+    "coachNote": "Con wearables conectados el AI Coach incluye tus datos de recuperacion en sus analisis.",
+    "stravaDesc": "Sincroniza actividades, frecuencia cardiaca y esfuerzo percibido",
+    "garminDesc": "Body Battery, HRV y metricas de recuperacion avanzadas",
+    "polarDesc": "Carga de entrenamiento y estado de recuperacion"
   }
 }

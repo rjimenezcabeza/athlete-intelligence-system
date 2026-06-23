@@ -139,6 +139,14 @@ CRITICAL RULE: Never respond with generic advice if you have specific data. ALWA
     }
   }
 
+  if (context.wearables?.strava?.recentActivities?.length > 0) {
+    prompt += '\n'
+    prompt += isEs ? '== ACTIVIDADES STRAVA (ultimas sesiones) ==\n' : '== STRAVA ACTIVITIES (recent) ==\n'
+    for (const act of context.wearables.strava.recentActivities.slice(0, 3)) {
+      prompt += `${act.date}: ${act.type} - ${act.distanceKm ? act.distanceKm + 'km' : ''} ${act.durationMin ? act.durationMin + 'min' : ''} ${act.avgHeartRate ? 'FC:' + act.avgHeartRate + 'bpm' : ''}\n`
+    }
+  }
+
   prompt += '\n'
   if (dc.score < 30) {
     prompt += isEs

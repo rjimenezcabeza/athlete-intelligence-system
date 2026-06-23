@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { PushNotificationToggle } from '@/components/settings/PushNotificationToggle'
+import { WearablesPanel } from '@/components/settings/WearablesPanel'
 
 const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
@@ -442,6 +443,9 @@ export default function ProfilePage() {
             </button>
             <div style={{ marginTop: 14 }}>
               <PushNotificationToggle locale={locale} />
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <WearablesPanel locale={locale} />
             </div>
           </div>
         </div>
