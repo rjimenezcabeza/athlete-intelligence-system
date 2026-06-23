@@ -26,7 +26,16 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/dashboard/summary')
       .then(r => { if (r.status === 401) { router.push('/' + locale + '/login'); return null } return r.json() })
-      .then(d => { if (d) { setData(d); setLoading(false) } })
+      .then(d => {
+        if (d) {
+          if (!d?.profile?.import_onboarded_at && !d?.profile?.training_experience_years) {
+            router.push('/' + locale + '/onboarding')
+            return
+          }
+          setData(d)
+          setLoading(false)
+        }
+      })
       .catch(() => setLoading(false))
   }, [])
 

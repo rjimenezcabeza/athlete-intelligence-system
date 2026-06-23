@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { PushNotificationToggle } from '@/components/settings/PushNotificationToggle'
 
 const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
@@ -439,6 +440,9 @@ export default function ProfilePage() {
             <button onClick={handleSave} disabled={saving} style={{ marginTop: 14, width: '100%', background: 'rgba(200,255,0,0.08)', color: ACC, border: '1px solid rgba(200,255,0,0.15)', borderRadius: 12, padding: '12px', fontSize: 13, fontWeight: 700, fontFamily: 'Syne, sans-serif', cursor: saving ? 'not-allowed' : 'pointer' }}>
               {saving ? '...' : (isEs ? 'Guardar configuración' : 'Save settings')}
             </button>
+            <div style={{ marginTop: 14 }}>
+              <PushNotificationToggle locale={locale} />
+            </div>
           </div>
         </div>
 

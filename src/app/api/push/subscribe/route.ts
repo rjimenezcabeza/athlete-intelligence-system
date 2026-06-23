@@ -46,3 +46,27 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json()
+    const { endpoint } = body
+    if (!endpoint) return NextResponse.json({ error: 'Missing endpoint' }, { status: 400 })
+
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+    )
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    await (supabase as any).from('push_subscriptions').delete().eq('endpoint', endpoint)
+
+    return NextResponse.json({ success: true })
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  }
+}
