@@ -1,301 +1,353 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { inflateRawSync } from 'zlib'
 
 export const maxDuration = 60
 
-function adminDb() {
-  return createClient(
-    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
-    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
+const EXTRACTION_SYSTEM_PROMPT = `Eres un experto en analisis de programas de entrenamiento para hipertrofia.
+Tu tarea es extraer datos estructurados de documentos de entrenamiento y nutricion.
 
-async function resolveUserId(bodyUserId: string): Promise<string | null> {
-  if (bodyUserId && bodyUserId.length > 10) return bodyUserId
-  try {
-    const store = await cookies()
-    const supa = createServerClient(
-      (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
-      (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
-      { cookies: { getAll() { return store.getAll() }, setAll() {} } }
-    )
-    const { data: { user } } = await supa.auth.getUser()
-    return user?.id ?? null
-  } catch (e) {
-    console.error('[resolveUserId error]', e)
-    return null
-  }
-}
+SIEMPRE devuelves un JSON valido con esta estructura exacta (null para campos no encontrados):
 
-function ascii(s: string, max = 6000): string {
-  let o = ''
-  for (let i = 0; i < s.length && o.length < max; i++) {
-    const c = s.charCodeAt(i)
-    if ((c >= 32 && c <= 126) || c === 10 || c === 13 || c === 9) o += s[i]
-  }
-  return o.trim()
-}
-
-function safeParseJSON(text: string): any {
-  try { return JSON.parse(text.trim()) } catch {}
-  const s = text.indexOf('{'), e = text.lastIndexOf('}')
-  if (s !== -1 && e > s) { try { return JSON.parse(text.slice(s, e + 1)) } catch {} }
-  return { confidence: 0, extraction_notes: 'parse_error', sessions: [] }
-}
-
-function readZipEntry(buf: Buffer, filename: string): Buffer | null {
-  let pos = 0
-  while (pos < buf.length - 30) {
-    if (buf.readUInt32LE(pos) !== 0x04034b50) { pos++; continue }
-    const compression = buf.readUInt16LE(pos + 8)
-    const compressedSize = buf.readUInt32LE(pos + 18)
-    const fnLen = buf.readUInt16LE(pos + 26)
-    const extraLen = buf.readUInt16LE(pos + 28)
-    const fn = buf.slice(pos + 30, pos + 30 + fnLen).toString('utf8')
-    const dataStart = pos + 30 + fnLen + extraLen
-    const dataEnd = dataStart + compressedSize
-    if (fn === filename || fn.endsWith('/' + filename)) {
-      const data = buf.slice(dataStart, Math.min(dataEnd, buf.length))
-      try {
-        if (compression === 0) return data
-        if (compression === 8) return inflateRawSync(data)
-      } catch { return null }
-    }
-    pos = dataEnd > pos + 1 ? dataEnd : pos + 1
-  }
-  return null
-}
-
-function xlsxToText(buffer: Buffer): string {
-  const lines: string[] = []
-  try {
-    const ssXml = readZipEntry(buffer, 'xl/sharedStrings.xml')
-    const ss: string[] = []
-    if (ssXml) {
-      const xml = ssXml.toString('utf8')
-      const reSi = new RegExp('<si>[\\s\\S]*?<\\/si>', 'g')
-      const reT  = new RegExp('<t[^>]*>([^<]*)<\\/t>', 'g')
-      const blocks = xml.match(reSi) ?? []
-      for (const si of blocks) {
-        const tags = si.match(new RegExp('<t[^>]*>([^<]*)<\\/t>', 'g')) ?? []
-        ss.push(ascii(tags.map(t => t.replace(new RegExp('<[^>]+>', 'g'), '').trim()).join(' '), 150))
-      }
-    }
-    console.log('[xlsx] sharedStrings count:', ss.length)
-    const reRow  = new RegExp('<row[^>]*>[\\s\\S]*?<\\/row>', 'g')
-    const reCell = new RegExp('<c[^>]*>[\\s\\S]*?<\\/c>', 'g')
-    const reV    = new RegExp('<v>([^<]*)<\\/v>')
-    for (let n = 1; n <= 3; n++) {
-      const sheetXml = readZipEntry(buffer, 'xl/worksheets/sheet' + n + '.xml')
-      if (!sheetXml) break
-      const xml = sheetXml.toString('utf8')
-      lines.push('--- Sheet ' + n + ' ---')
-      const rows = xml.match(reRow) ?? []
-      console.log('[xlsx] sheet' + n + ' rows:', rows.length)
-      for (const row of rows.slice(0, 150)) {
-        const cells = row.match(reCell) ?? []
-        const vals: string[] = []
-        for (const cell of cells) {
-          const tM = cell.match(/t="([^"]+)"/)
-          const vM = cell.match(reV)
-          if (tM && tM[1] === 's' && vM) vals.push(ss[parseInt(vM[1], 10)] ?? '')
-          else if (vM) vals.push(ascii(vM[1], 30))
-        }
-        const line = vals.filter(Boolean).join(' | ')
-        if (line.length > 2) lines.push(line)
-      }
-    }
-  } catch (e) {
-    console.error('[xlsxToText error]', e)
-    lines.push('xlsx error: ' + ascii(String(e), 80))
-  }
-  const result = lines.join('\n').slice(0, 6000)
-  console.log('[xlsx] final text length:', result.length, 'preview:', result.slice(0, 100))
-  return result || 'No content'
-}
-
-const SCHEMA = `{
-  "athlete": {"display_name":null,"body_weight_kg":null,"height_cm":null,"training_experience_years":null,"primary_goal":null},
-  "nutrition": {"calories_target":null,"protein_g":null,"carbs_g":null,"fat_g":null,"meals_per_day":null,"notes":null},
-  "training_program": {
-    "name":null,"split_type":null,"days_per_week":null,"mesocycle_weeks":null,
-    "days":[{"day_number":1,"day_label":"Push","exercises":[{"name":"Press Banca","sets":4,"rep_range_min":8,"rep_range_max":12,"rir_target":2,"rest_seconds":120,"notes":null}]}]
+{
+  "athlete": {
+    "display_name": null,
+    "body_weight_kg": null,
+    "height_cm": null,
+    "age": null,
+    "gender": null,
+    "training_experience_years": null,
+    "primary_goal": null
   },
-  "training_sessions": [{"date":"2024-01-15","day_label":"Push A","exercises":[{"name":"Press Banca","sets":[{"set_number":1,"weight_kg":80.0,"reps":8,"rir":2,"set_type":"working"}]}]}],
-  "confidence":0.85,
-  "notes":null
-}`
+  "nutrition": {
+    "calories_target": null,
+    "protein_g": null,
+    "carbs_g": null,
+    "fat_g": null,
+    "meals_per_day": null,
+    "notes": null
+  },
+  "training_program": {
+    "name": null,
+    "split_type": null,
+    "days_per_week": null,
+    "mesocycle_weeks": null,
+    "days": [
+      {
+        "day_number": 1,
+        "day_label": "Push",
+        "exercises": [
+          {
+            "name": "Press Banca",
+            "sets": 4,
+            "rep_range_min": 8,
+            "rep_range_max": 12,
+            "rir_target": 2,
+            "rest_seconds": 120,
+            "notes": null
+          }
+        ]
+      }
+    ]
+  },
+  "training_sessions": [
+    {
+      "date": "2024-01-15",
+      "day_label": null,
+      "exercises": [
+        {
+          "name": "Press Banca",
+          "sets": [
+            {
+              "set_number": 1,
+              "weight_kg": 80,
+              "reps": 8,
+              "rir": 2,
+              "set_type": "working"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "confidence": 0.85,
+  "notes": null
+}
 
-const SYSTEM_PROMPT = `Eres un experto en análisis de programas de entrenamiento para hipertrofia.
-Extrae TODOS los datos disponibles: perfil del atleta, nutrición, programa de entrenamiento y sesiones históricas.
-Normaliza pesos: si están en lbs, convierte a kg (divide entre 2.2046).
+Si es texto de Excel/CSV, analiza todas las columnas y filas para encontrar datos de entrenamiento.
+Normaliza pesos: si estan en lbs, convierte a kg (divide entre 2.2046).
 Para split_type usa: PPL, Upper/Lower, Torso/Pierna, Full Body, Bro Split, Arnold Split.
 primary_goal acepta: hypertrophy, strength, weight_loss, endurance.
-Si alguna sección no existe en el documento, usa null o array vacío.
-Devuelve SOLO JSON válido sin backticks ni texto adicional.`
+confidence va de 0 a 1 segun tu certeza de extraccion.
+NUNCA devuelvas texto extra, solo el JSON.`
 
-export async function POST(req: NextRequest) {
-  let importId = ''
-  const admin = adminDb()
+async function excelToText(buffer: ArrayBuffer): Promise<string> {
+  const XLSX = await import('xlsx')
+  const workbook = XLSX.read(buffer, { type: 'array' })
+  let text = ''
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName]
+    const csv = XLSX.utils.sheet_to_csv(sheet, { skipHidden: true })
+    if (csv.trim().length > 0) {
+      text += `=== HOJA: ${sheetName} ===\n${csv}\n\n`
+    }
+  }
+  return text.slice(0, 80000)
+}
 
+function fuzzyMatchExercise(importedName: string, exercises: any[]): any | null {
+  if (!importedName || !exercises?.length) return null
+  const normalize = (s: string) => s.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, '').trim()
+
+  const target = normalize(importedName)
+  let best: any = null
+  let bestScore = 0
+
+  for (const ex of exercises) {
+    const candidate = normalize(ex.name || '')
+    const targetWords = target.split(/\s+/).filter((w: string) => w.length > 2)
+    const candidateWords = candidate.split(/\s+/).filter((w: string) => w.length > 2)
+    const common = targetWords.filter((w: string) =>
+      candidateWords.some((c: string) => c.includes(w) || w.includes(c))
+    ).length
+    const score = targetWords.length > 0 ? common / Math.max(targetWords.length, candidateWords.length) : 0
+    if (score > bestScore && score >= 0.35) {
+      bestScore = score
+      best = { ...ex, matchConfidence: score }
+    }
+  }
+  return best
+}
+
+export async function POST(request: Request) {
   try {
-    // Leer body con manejo de errores
-    let body: any = {}
+    const body = await request.json()
+    const importedFileId = body.importedFileId || body.importId
+
+    if (!importedFileId) {
+      return NextResponse.json({ error: 'Missing importedFileId' }, { status: 400 })
+    }
+
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+      (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+    )
+
+    const { data: { user } } = await (supabase as any).auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: profile } = await (supabase as any)
+      .from('athlete_profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+
+    const { data: importedFile } = await (supabase as any)
+      .from('imported_files')
+      .select('id, original_filename, file_type, storage_path, import_status')
+      .eq('id', importedFileId)
+      .eq('athlete_id', profile.id)
+      .single()
+
+    if (!importedFile) return NextResponse.json({ error: 'File not found' }, { status: 404 })
+
+    // Mark as processing
+    await (supabase as any)
+      .from('imported_files')
+      .update({ import_status: 'processing' })
+      .eq('id', importedFileId)
+
+    // Download from storage (path is relative to 'imports' bucket)
+    const { data: fileData, error: downloadError } = await (supabase as any)
+      .storage
+      .from('imports')
+      .download(importedFile.storage_path)
+
+    if (downloadError || !fileData) {
+      console.error('[import/process] download error:', downloadError)
+      await (supabase as any)
+        .from('imported_files')
+        .update({
+          import_status: 'error',
+          extraction_notes: `Download failed: ${downloadError?.message || 'unknown'}`
+        })
+        .eq('id', importedFileId)
+      return NextResponse.json({ error: 'Failed to download file', details: downloadError?.message }, { status: 500 })
+    }
+
+    const arrayBuffer = await fileData.arrayBuffer()
+    const anthropic = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY ?? '').trim() })
+
+    let extractedData: any = null
+    let extractionNotes = ''
+
+    const filename = importedFile.original_filename || ''
+    const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+    const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'].includes(ext)
+    const isPDF = ext === 'pdf'
+    const isExcel = ['xlsx', 'xls', 'xlsm', 'xlsb', 'csv'].includes(ext) || importedFile.file_type === 'excel'
+
     try {
-      const rawBody = await req.text()
-      console.log('[process] raw body:', rawBody.slice(0, 200))
-      body = JSON.parse(rawBody)
-    } catch (parseErr) {
-      console.error('[process] body parse failed:', parseErr)
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+      let messageContent: any[]
+
+      if (isImage) {
+        const base64 = Buffer.from(arrayBuffer).toString('base64')
+        const mimeMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/jpeg' }
+        const mimeType = mimeMap[ext] ?? 'image/jpeg'
+        messageContent = [
+          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+          { type: 'text', text: 'Analiza esta imagen de entrenamiento/nutricion y extrae todos los datos. Devuelve SOLO el JSON.' }
+        ]
+      } else if (isPDF) {
+        const base64 = Buffer.from(arrayBuffer).toString('base64')
+        messageContent = [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+          { type: 'text', text: 'Analiza este PDF de entrenamiento/nutricion. Devuelve SOLO el JSON.' }
+        ]
+      } else if (isExcel) {
+        const textContent = await excelToText(arrayBuffer)
+        console.log('[import/process] excel text len:', textContent.length)
+        messageContent = [
+          { type: 'text', text: `Analiza este contenido de hoja de calculo de entrenamiento/nutricion y extrae todos los datos estructurados:\n\n${textContent}\n\nDevuelve SOLO el JSON sin ningun texto adicional ni backticks.` }
+        ]
+      } else {
+        const textContent = Buffer.from(arrayBuffer).toString('utf-8').slice(0, 80000)
+        messageContent = [
+          { type: 'text', text: `Analiza este contenido de entrenamiento/nutricion:\n\n${textContent}\n\nDevuelve SOLO el JSON sin ningun texto adicional ni backticks.` }
+        ]
+      }
+
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        system: EXTRACTION_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: messageContent }]
+      })
+
+      const rawText = response.content[0].type === 'text' ? response.content[0].text : ''
+      const cleanText = rawText
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim()
+      extractedData = JSON.parse(cleanText)
+    } catch (aiError) {
+      extractionNotes = `AI extraction failed: ${aiError instanceof Error ? aiError.message : 'unknown'}`
+      console.error('[import/process] AI error:', aiError)
     }
 
-    importId = String(body.importId ?? '')
-    console.log('[process] importId:', importId, 'userId:', String(body.userId ?? '').slice(0, 8))
-
-    if (!importId) return NextResponse.json({ error: 'importId requerido' }, { status: 400 })
-
-    const userId = await resolveUserId(String(body.userId ?? ''))
-    console.log('[process] resolved userId:', userId?.slice(0, 8) ?? 'null')
-    if (!userId) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-
-    const { data: profile } = await (admin as any)
-      .from('athlete_profiles').select('id').eq('user_id', userId).single()
-    console.log('[process] profile:', profile?.id?.slice(0, 8) ?? 'null')
-    if (!profile) return NextResponse.json({ error: 'Perfil no encontrado' }, { status: 404 })
-
-    const { data: rec } = await (admin as any)
-      .from('imported_files').select('*').eq('id', importId).eq('athlete_id', profile.id).single()
-    console.log('[process] rec found:', !!rec, 'status:', rec?.import_status)
-    if (!rec) return NextResponse.json({ error: 'Importacion no encontrada' }, { status: 404 })
-
-    await (admin as any).from('imported_files').update({ import_status: 'processing' }).eq('id', importId)
-
-    const { data: signed, error: signErr } = await (admin as any).storage
-      .from('imports').createSignedUrl(String(rec.storage_path), 120)
-    console.log('[process] signed url ok:', !!signed?.signedUrl, 'err:', signErr?.message)
-    if (!signed?.signedUrl) throw new Error('Signed URL failed: ' + (signErr?.message ?? 'unknown'))
-
-    const fetchRes = await fetch(String(signed.signedUrl))
-    console.log('[process] download status:', fetchRes.status)
-    if (!fetchRes.ok) throw new Error('Download failed: ' + fetchRes.status)
-    const buf = Buffer.from(await fetchRes.arrayBuffer())
-    console.log('[process] buffer size:', buf.length)
-
-    const storagePath = String(rec.storage_path)
-    const ext = (storagePath.split('.').pop() ?? '').toLowerCase()
-    const isImg = ['jpg','jpeg','png','webp','gif'].includes(ext)
-    const isXlsx = ['xlsx','xls','xlsm','xlsb'].includes(ext)
-    console.log('[process] fileType:', isImg ? 'image' : isXlsx ? 'excel' : 'text', 'ext:', ext)
-
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    let rawText = ''
-
-    if (isImg) {
-      const mimes: Record<string,string> = { jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif' }
-      const mime = (mimes[ext] ?? 'image/jpeg') as 'image/jpeg'|'image/png'|'image/webp'|'image/gif'
-      console.log('[process] calling anthropic for image...')
-      const r = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6', max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: mime, data: buf.toString('base64') } },
-          { type: 'text', text: 'Analiza este documento y extrae todos los datos. Formato JSON exacto: ' + SCHEMA }
-        ]}]
-      })
-      rawText = (r.content[0] as any).text ?? '{}'
-    } else if (isXlsx) {
-      const text = xlsxToText(buf)
-      console.log('[process] calling anthropic for excel, text len:', text.length)
-      const r = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6', max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: 'Extrae TODOS los datos de entrenamiento y nutrición. Formato JSON exacto: ' + SCHEMA + '\n\nDatos:\n' + text }]
-      })
-      rawText = (r.content[0] as any).text ?? '{}'
-    } else {
-      const text = ascii(buf.toString('utf8'), 6000)
-      const r = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6', max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: 'Extrae todos los datos de entrenamiento y nutrición. Formato JSON exacto: ' + SCHEMA + '\n\n' + text }]
-      })
-      rawText = (r.content[0] as any).text ?? '{}'
+    if (!extractedData) {
+      await (supabase as any)
+        .from('imported_files')
+        .update({
+          import_status: 'error',
+          extraction_notes: extractionNotes,
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', importedFileId)
+      return NextResponse.json({ error: 'Extraction failed', notes: extractionNotes }, { status: 422 })
     }
 
-    console.log('[process] anthropic response len:', rawText.length, 'preview:', rawText.slice(0, 80))
-    const extractedData = safeParseJSON(rawText)
-    const confidence = Number(extractedData?.confidence ?? 0)
+    // Fuzzy match exercises against DB
+    const { data: dbExercises } = await (supabase as any)
+      .from('exercises')
+      .select('id, name, muscle_group_primary')
+      .eq('is_global', true)
 
-    // Soporte schema antiguo (solo sessions[]) y nuevo schema completo
-    const legacySessions = (extractedData?.sessions ?? []).filter((s: any) => s?.exercises?.length > 0)
-    const newSessions = (extractedData?.training_sessions ?? []).filter((s: any) => s?.exercises?.length > 0)
-    const sessions = newSessions.length > 0 ? newSessions : legacySessions
-    const hasProgram = !!(extractedData?.training_program?.days?.length)
-    const hasProfile = !!(extractedData?.athlete)
-    const hasNutrition = !!(extractedData?.nutrition?.calories_target || extractedData?.nutrition?.protein_g)
-    console.log('[process] confidence:', confidence, 'sessions:', sessions.length, 'hasProgram:', hasProgram)
+    const processedDays = (extractedData.training_program?.days ?? []).map((day: any) => ({
+      ...day,
+      exercises: (day.exercises ?? []).map((ex: any) => ({
+        ...ex,
+        matched_exercise: fuzzyMatchExercise(ex.name, dbExercises || [])
+      }))
+    }))
 
-    // Guardar review items
+    const enrichedData = {
+      ...extractedData,
+      training_program: {
+        ...extractedData.training_program,
+        days: processedDays
+      }
+    }
+
+    // Create review items
     const reviewItems: any[] = []
-
-    if (hasProfile || hasNutrition || hasProgram) {
+    if (extractedData.athlete || extractedData.nutrition) {
       reviewItems.push({
-        imported_file_id: importId, item_type: 'template',
-        raw_extracted: {
-          type: 'profile_nutrition_program',
-          athlete: extractedData.athlete,
-          nutrition: extractedData.nutrition,
-          training_program: extractedData.training_program
-        },
-        review_status: 'pending', confidence_score: confidence
+        imported_file_id: importedFileId,
+        item_type: 'template',
+        raw_extracted: { type: 'profile', athlete: extractedData.athlete, nutrition: extractedData.nutrition },
+        review_status: 'pending',
+        confidence_score: extractedData.confidence || 0.8
       })
     }
-
-    for (const s of sessions) {
+    for (const session of (extractedData.training_sessions || [])) {
       reviewItems.push({
-        imported_file_id: importId, item_type: 'session',
-        raw_extracted: s, review_status: 'pending', confidence_score: confidence
+        imported_file_id: importedFileId,
+        item_type: 'session',
+        raw_extracted: session,
+        review_status: 'pending',
+        confidence_score: extractedData.confidence || 0.8
       })
     }
-
     if (reviewItems.length > 0) {
-      await (admin as any).from('import_review_items').insert(reviewItems)
+      await (supabase as any).from('import_review_items').insert(reviewItems)
     }
 
-    const hasAnyData = sessions.length > 0 || hasProgram || hasProfile || hasNutrition
-    const status = confidence < 0.3 || !hasAnyData ? 'error' : 'review_required'
+    const totalExercisesInProgram = processedDays.reduce(
+      (sum: number, d: any) => sum + (d.exercises?.length || 0), 0
+    )
+    const mappedExercises = processedDays.reduce(
+      (sum: number, d: any) => sum + (d.exercises?.filter((e: any) => e.matched_exercise)?.length || 0), 0
+    )
 
-    await (admin as any).from('imported_files').update({
-      import_status: status,
-      extracted_data: extractedData,
-      extraction_confidence: confidence,
-      extraction_notes: ascii(String(extractedData?.notes ?? extractedData?.extraction_notes ?? ''), 200),
-      processed_at: new Date().toISOString()
-    }).eq('id', importId)
+    await (supabase as any)
+      .from('imported_files')
+      .update({
+        import_status: 'review_required',
+        extracted_data: enrichedData,
+        extraction_confidence: extractedData.confidence || 0.8,
+        extraction_notes: extractedData.notes,
+        processed_at: new Date().toISOString()
+      })
+      .eq('id', importedFileId)
 
     return NextResponse.json({
       success: true,
-      confidence,
-      status,
-      sessionsFound: sessions.length,
-      hasProgram,
-      hasProfile,
-      hasNutrition
+      status: 'review_required',
+      importedFileId,
+      confidence: extractedData.confidence,
+      sessionsFound: extractedData.training_sessions?.length || 0,
+      hasProgram: processedDays.length > 0,
+      hasProfile: !!(extractedData.athlete || extractedData.nutrition),
+      hasNutrition: !!(extractedData.nutrition?.calories_target || extractedData.nutrition?.protein_g),
+      extracted: {
+        hasProfile: !!(extractedData.athlete || extractedData.nutrition),
+        hasProgram: processedDays.length > 0,
+        hasSessions: !!(extractedData.training_sessions?.length),
+        hasNutrition: !!(extractedData.nutrition?.calories_target || extractedData.nutrition?.protein_g),
+        confidence: extractedData.confidence,
+        summary: {
+          athleteName: extractedData.athlete?.display_name,
+          splitDetected: extractedData.training_program?.split_type,
+          daysPerWeek: extractedData.training_program?.days_per_week,
+          sessionsCount: extractedData.training_sessions?.length || 0,
+          exercisesInProgram: totalExercisesInProgram,
+          mappedExercises,
+          calories: extractedData.nutrition?.calories_target,
+          protein: extractedData.nutrition?.protein_g
+        }
+      }
     })
-
-  } catch (e) {
-    const msg = ascii(e instanceof Error ? e.message : String(e), 200)
-    console.error('[process] CATCH ERROR:', msg)
-    if (importId) {
-      await (admin as any).from('imported_files')
-        .update({ import_status: 'error', extraction_notes: msg }).eq('id', importId).catch(() => {})
-    }
-    return NextResponse.json({ error: msg }, { status: 500 })
+  } catch (error) {
+    console.error('[import/process] error:', error)
+    return NextResponse.json({ error: 'Internal error', details: String(error) }, { status: 500 })
   }
 }

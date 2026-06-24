@@ -56,6 +56,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [focusField, setFocusField] = useState<string | null>(null)
+  const [accentColor, setAccentColor] = useState('#C8FF00')
+  const [uiTheme, setUiTheme] = useState('dark')
 
   // Daily log state
   const [dailyForm, setDailyForm] = useState<any>({ weight: '', energy: '', sleep: '', stress: '', notes: '' })
@@ -71,9 +73,27 @@ export default function ProfilePage() {
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
 
+  const handleUpdateProfile = async (updates: Record<string, any>) => {
+    if (updates.accent_color) setAccentColor(updates.accent_color)
+    if (updates.ui_theme) setUiTheme(updates.ui_theme)
+    setProfile((p: any) => ({ ...p, ...updates }))
+    try {
+      await fetch('/api/profile/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+    } catch {}
+  }
+
   useEffect(() => {
     fetch('/api/profile/me').then(r => r.json()).then(d => {
-      if (d.profile) { setProfile(d.profile); setForm(d.profile) }
+      if (d.profile) {
+        setProfile(d.profile)
+        setForm(d.profile)
+        if (d.profile.accent_color) setAccentColor(d.profile.accent_color)
+        if (d.profile.ui_theme) setUiTheme(d.profile.ui_theme)
+      }
     })
     fetch('/api/daily-log').then(r => r.json()).then(d => setDailyLogs(d.logs ?? []))
     fetch('/api/dashboard/summary').then(r => r.json()).then(d => setStats(d.stats))
@@ -414,38 +434,167 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Configuración */}
+        {/* Configuración — Push + Wearables */}
         <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, overflow: 'hidden', ...animStyle(160) }}>
           <div style={{ padding: '14px 20px 14px' }}>
             <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 14 }}>
               {isEs ? 'Configuración' : 'Settings'}
             </p>
+            <PushNotificationToggle locale={locale} />
+            <div style={{ marginTop: 14 }}>
+              <WearablesPanel locale={locale} />
+            </div>
+          </div>
+        </div>
+
+        {/* Aspecto de la app */}
+        <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, overflow: 'hidden', ...animStyle(170) }}>
+          <div style={{ padding: '14px 20px 20px' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 14 }}>
+              {isEs ? 'Aspecto de la app' : 'App appearance'}
+            </p>
+
+            {/* Accent color */}
             <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>{isEs ? 'Color de acento' : 'Accent color'}</label>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {[
+                  { color: '#C8FF00', name: 'Lime' },
+                  { color: '#00D4FF', name: 'Cyan' },
+                  { color: '#FF6B35', name: 'Orange' },
+                  { color: '#A855F7', name: 'Purple' },
+                  { color: '#EC4899', name: 'Pink' },
+                  { color: '#10B981', name: 'Emerald' },
+                  { color: '#F59E0B', name: 'Amber' },
+                  { color: '#EF4444', name: 'Red' },
+                ].map(({ color, name }) => (
+                  <button
+                    key={color}
+                    onClick={() => handleUpdateProfile({ accent_color: color })}
+                    title={name}
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%', background: color,
+                      border: accentColor === color ? '3px solid #fff' : '3px solid transparent',
+                      cursor: 'pointer', outline: 'none',
+                      boxShadow: accentColor === color ? `0 0 0 2px ${color}40` : 'none',
+                      transition: 'all 0.2s'
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Base theme */}
+            <div>
+              <label style={labelStyle}>{isEs ? 'Tema base' : 'Base theme'}</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
+                {[
+                  { value: 'dark', label: isEs ? 'Oscuro' : 'Dark', bg: '#0A0A0F', preview: '#1a1a24' },
+                  { value: 'dark_soft', label: isEs ? 'Oscuro suave' : 'Soft dark', bg: '#111318', preview: '#1c2030' },
+                  { value: 'midnight', label: 'Midnight', bg: '#080C14', preview: '#0f1624' },
+                  { value: 'forest', label: 'Forest', bg: '#0A0F0A', preview: '#111a11' },
+                  { value: 'ocean', label: 'Ocean', bg: '#090D14', preview: '#0f1520' },
+                ].map(theme => (
+                  <button
+                    key={theme.value}
+                    onClick={() => handleUpdateProfile({ ui_theme: theme.value })}
+                    style={{
+                      padding: 10, background: theme.bg,
+                      border: `1px solid ${uiTheme === theme.value ? accentColor : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: 10, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start'
+                    }}
+                  >
+                    <div style={{ width: '100%', height: 18, borderRadius: 4, background: theme.preview }} />
+                    <span style={{ fontSize: 11, color: uiTheme === theme.value ? accentColor : '#888', fontFamily: 'DM Mono, monospace' }}>
+                      {theme.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Notificaciones */}
+        <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, overflow: 'hidden', ...animStyle(180) }}>
+          <div style={{ padding: '14px 20px 20px' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 14 }}>
+              {isEs ? 'Notificaciones' : 'Notifications'}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { key: 'notification_workout_reminders', es: 'Recordatorios de entrenamiento', en: 'Workout reminders', esDesc: 'Avisa cuando llevas más de 2 días sin entrenar', enDesc: "Alerts when you haven't trained in 2+ days" },
+                { key: 'notification_progression_alerts', es: 'Alertas de progresión', en: 'Progression alerts', esDesc: 'Cuando el motor detecta estancamiento o PR', enDesc: 'When the engine detects stalling or PR' },
+                { key: 'notification_coach_insights', es: 'Insights del Coach', en: 'Coach insights', esDesc: 'Análisis semanales del AI Coach', enDesc: 'Weekly AI Coach analysis' },
+                { key: 'notification_weekly_summary', es: 'Resumen semanal', en: 'Weekly summary', esDesc: 'Volumen, PRs y logros de la semana', enDesc: 'Volume, PRs and weekly achievements' }
+              ].map(notif => {
+                const isEnabled = (profile as any)?.[notif.key] !== false
+                return (
+                  <div key={notif.key} style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: '#ccc', fontFamily: 'DM Mono, monospace', marginBottom: 2 }}>
+                        {isEs ? notif.es : notif.en}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#555' }}>
+                        {isEs ? notif.esDesc : notif.enDesc}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUpdateProfile({ [notif.key]: !isEnabled })}
+                      style={{ width: 44, height: 24, borderRadius: 12, background: isEnabled ? accentColor : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}
+                    >
+                      <div style={{ position: 'absolute', top: 3, left: isEnabled ? 22 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Ajustes técnicos */}
+        <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, overflow: 'hidden', ...animStyle(190) }}>
+          <div style={{ padding: '14px 20px 20px' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 14 }}>
+              {isEs ? 'Ajustes técnicos' : 'Technical settings'}
+            </p>
+
+            {/* Language */}
+            <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>{isEs ? 'Idioma' : 'Language'}</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {LANGUAGES.map(l => (
-                  <button key={l.key} onClick={() => setForm((f: any) => ({ ...f, language: l.key }))} style={{ padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: form.language === l.key ? 'rgba(200,255,0,0.12)' : '#0d0d14', color: form.language === l.key ? ACC : T2, border: '1px solid ' + (form.language === l.key ? 'rgba(200,255,0,0.3)' : BORDER), fontFamily: 'Syne, sans-serif' }}>
+                  <button key={l.key}
+                    onClick={async () => {
+                      await handleUpdateProfile({ language: l.key })
+                      window.location.href = `/${l.key}/profile`
+                    }}
+                    style={{ padding: '7px 12px', background: locale === l.key ? 'rgba(200,255,0,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${locale === l.key ? 'rgba(200,255,0,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: locale === l.key ? ACC : '#888', fontSize: 12, cursor: 'pointer', fontFamily: 'DM Mono, monospace' }}>
                     {l.label}
                   </button>
                 ))}
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontSize: 13, color: T2 }}>{isEs ? 'Unidades de peso' : 'Weight units'}</span>
-              <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1px solid ' + BORDER }}>
-                {['kg', 'lbs'].map(u => (
-                  <button key={u} onClick={() => setForm((f: any) => ({ ...f, weight_unit: u }))} style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, background: form.weight_unit === u ? ACC : '#0d0d14', color: form.weight_unit === u ? BG : T3, border: 'none', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>{u}</button>
+
+            {/* Weight unit */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>{isEs ? 'Unidad de peso' : 'Weight unit'}</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['kg', 'lbs'].map(unit => (
+                  <button key={unit}
+                    onClick={() => handleUpdateProfile({ weight_unit: unit })}
+                    style={{ padding: '7px 18px', background: (profile?.weight_unit || 'kg') === unit ? 'rgba(200,255,0,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${(profile?.weight_unit || 'kg') === unit ? 'rgba(200,255,0,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 8, color: (profile?.weight_unit || 'kg') === unit ? ACC : '#888', fontSize: 13, cursor: 'pointer', fontFamily: 'DM Mono, monospace' }}>
+                    {unit}
+                  </button>
                 ))}
               </div>
             </div>
-            <button onClick={handleSave} disabled={saving} style={{ marginTop: 14, width: '100%', background: 'rgba(200,255,0,0.08)', color: ACC, border: '1px solid rgba(200,255,0,0.15)', borderRadius: 12, padding: '12px', fontSize: 13, fontWeight: 700, fontFamily: 'Syne, sans-serif', cursor: saving ? 'not-allowed' : 'pointer' }}>
-              {saving ? '...' : (isEs ? 'Guardar configuración' : 'Save settings')}
-            </button>
-            <div style={{ marginTop: 14 }}>
-              <PushNotificationToggle locale={locale} />
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <WearablesPanel locale={locale} />
+
+            {/* App version */}
+            <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, fontSize: 11, color: '#444', fontFamily: 'DM Mono, monospace', display: 'flex', justifyContent: 'space-between' }}>
+              <span>AIS v1.0.0</span>
+              <span>Sprints A–K</span>
             </div>
           </div>
         </div>
