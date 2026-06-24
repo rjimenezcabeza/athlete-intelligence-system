@@ -473,19 +473,26 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
       {/* STEP: Error */}
       {step === 'error' && (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ fontSize: '36px', marginBottom: '14px' }}>❌</div>
+          <div style={{ fontSize: '36px', marginBottom: '14px' }}>⚠️</div>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#FF5252', fontFamily: 'Syne, sans-serif', marginBottom: '8px' }}>
-            {isEs ? 'Error en la importación' : 'Import error'}
+            {isEs ? 'Error en el análisis' : 'Analysis error'}
           </div>
-          <p style={{ fontSize: '12px', color: '#666', margin: '0 0 20px', fontFamily: 'DM Mono, monospace' }}>{errorMsg}</p>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+          <p style={{ fontSize: '12px', color: '#666', margin: '0 0 6px', fontFamily: 'DM Mono, monospace', lineHeight: '1.5' }}>
+            {errorMsg?.includes('download') || errorMsg?.includes('storage')
+              ? (isEs
+                  ? 'El archivo no se pudo leer del servidor. Por favor, vuelve a subirlo.'
+                  : 'The file could not be read from the server. Please upload it again.')
+              : errorMsg
+            }
+          </p>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '16px', flexWrap: 'wrap' }}>
             {timedOut && importId ? (
-              <button onClick={handleRetryTimeout} style={{ padding: '10px 24px', background: 'rgba(200,255,0,0.1)', border: '1px solid rgba(200,255,0,0.25)', borderRadius: '10px', color: '#C8FF00', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>
+              <button onClick={handleRetryTimeout} style={{ padding: '10px 20px', background: 'rgba(200,255,0,0.1)', border: '1px solid rgba(200,255,0,0.25)', borderRadius: '10px', color: '#C8FF00', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>
                 {isEs ? 'Reintentar' : 'Retry'}
               </button>
             ) : null}
-            <button onClick={reset} style={{ padding: '10px 24px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#ccc', fontSize: '13px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' }}>
-              {isEs ? 'Volver' : 'Back'}
+            <button onClick={reset} style={{ padding: '10px 20px', background: '#C8FF00', border: 'none', borderRadius: '10px', color: '#0A0A0F', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>
+              {isEs ? 'Subir de nuevo' : 'Upload again'}
             </button>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { SessionDetailModal } from '@/components/history/SessionDetailModal'
 
 const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
@@ -38,6 +39,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterPeriod>('month')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [deleteModal, setDeleteModal] = useState<SessionRow | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -219,9 +221,9 @@ export default function HistoryPage() {
                         ))}
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <Link href={`/${locale}/session/${s.id}`} style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#16161f', color: T2, border: '1px solid ' + BORDER }}>
+                        <button onClick={() => setSelectedSessionId(s.id)} style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#16161f', color: T2, border: '1px solid ' + BORDER, cursor: 'pointer' }}>
                           {isEs ? 'Ver detalle →' : 'View detail →'}
-                        </Link>
+                        </button>
                         <button onClick={() => setDeleteModal(s)} style={{ padding: '10px 14px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.08)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.15)', cursor: 'pointer' }}>
                           {isEs ? 'Eliminar' : 'Delete'}
                         </button>
@@ -234,6 +236,15 @@ export default function HistoryPage() {
           </div>
         )}
       </div>
+
+      {/* SESSION DETAIL MODAL */}
+      {selectedSessionId && (
+        <SessionDetailModal
+          sessionId={selectedSessionId}
+          onClose={() => setSelectedSessionId(null)}
+          locale={locale}
+        />
+      )}
 
       {/* DELETE MODAL */}
       {deleteModal && (

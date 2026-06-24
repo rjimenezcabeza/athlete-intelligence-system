@@ -164,22 +164,40 @@ export async function POST(request: Request) {
       .update({ import_status: 'processing' })
       .eq('id', importedFileId)
 
-    // Download from storage (path is relative to 'imports' bucket)
-    const { data: fileData, error: downloadError } = await (supabase as any)
-      .storage
-      .from('imports')
-      .download(importedFile.storage_path)
+    // Download from storage — try stored path first, then fallback variations
+    let fileData: any = null
 
-    if (downloadError || !fileData) {
-      console.error('[import/process] download error:', downloadError)
+    const attempt1 = await (supabase as any)
+      .storage.from('imports').download(importedFile.storage_path)
+    console.error('[import/process] attempt1 path:', importedFile.storage_path, 'error:', JSON.stringify(attempt1.error))
+
+    if (attempt1.data) {
+      fileData = attempt1.data
+    } else {
+      // Fallback: try just the filename (no folder prefix)
+      const pathParts = (importedFile.storage_path as string).split('/')
+      const filename = pathParts[pathParts.length - 1]
+      const attempt2 = await (supabase as any)
+        .storage.from('imports').download(filename)
+      console.error('[import/process] attempt2 path:', filename, 'error:', JSON.stringify(attempt2.error))
+      if (attempt2.data) {
+        fileData = attempt2.data
+      }
+    }
+
+    if (!fileData) {
       await (supabase as any)
         .from('imported_files')
         .update({
           import_status: 'error',
-          extraction_notes: `Download failed: ${downloadError?.message || 'unknown'}`
+          extraction_notes: `Download failed. Path: ${importedFile.storage_path}. File may not exist in storage — please re-upload.`
         })
         .eq('id', importedFileId)
-      return NextResponse.json({ error: 'Failed to download file', details: downloadError?.message }, { status: 500 })
+      return NextResponse.json({
+        error: 'Failed to download file from storage',
+        storagePath: importedFile.storage_path,
+        hint: 'File may not exist in storage. Re-upload the file.'
+      }, { status: 500 })
     }
 
     const arrayBuffer = await fileData.arrayBuffer()

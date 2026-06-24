@@ -4,6 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { PushNotificationToggle } from '@/components/settings/PushNotificationToggle'
 import { WearablesPanel } from '@/components/settings/WearablesPanel'
+import { AvatarUpload } from '@/components/profile/AvatarUpload'
+import { ThemeProvider } from '@/components/providers/ThemeProvider'
 
 const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
@@ -170,19 +172,22 @@ export default function ProfilePage() {
   )
 
   const isPro = profile.subscription_tier === 'pro'
-  const avatar = (profile.display_name ?? 'A').charAt(0).toUpperCase()
 
   return (
+    <ThemeProvider initialAccent={accentColor} initialTheme={uiTheme}>
     <div style={{ minHeight: '100vh', background: BG, color: T1, paddingBottom: 96 }}>
       <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {/* HEADER */}
       <div style={{ padding: '40px 20px 24px', ...animStyle(0) }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg,#C8FF00,#88DD00)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, color: BG, fontFamily: 'Syne, sans-serif', flexShrink: 0, boxShadow: '0 0 24px rgba(200,255,0,0.2)' }}>
-            {avatar}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <AvatarUpload
+          currentUrl={profile.avatar_url}
+          displayName={profile.display_name}
+          locale={locale}
+          onUploadComplete={(url) => setProfile((p: any) => ({ ...p, avatar_url: url }))}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
               <h1 style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: T1 }}>{profile.display_name}</h1>
               {isPro && <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', fontFamily: 'Syne, sans-serif', background: 'rgba(200,255,0,0.15)', color: ACC, border: '1px solid rgba(200,255,0,0.3)' }}>PRO</span>}
@@ -668,5 +673,6 @@ export default function ProfilePage() {
         </div>
       )}
     </div>
+    </ThemeProvider>
   )
 }
