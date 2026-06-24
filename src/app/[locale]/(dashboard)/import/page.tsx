@@ -17,6 +17,8 @@ const ST: Record<string, { es: string; en: string; color: string }> = {
   error:           { es: 'Error',       en: 'Error',      color: '#FF6B6B' },
 }
 
+interface PendingFile { id: string; original_filename: string; file_size_bytes: number; uploaded_at: string }
+
 export default function ImportPage() {
   const params = useParams()
   const router = useRouter()
@@ -26,6 +28,7 @@ export default function ImportPage() {
   const [selected, setSelected] = useState<ImportRecord | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [pendingReady, setPendingReady] = useState<PendingFile[]>([])
 
   const load = async () => {
     try {
@@ -38,7 +41,17 @@ export default function ImportPage() {
     } catch {}
   }
 
-  useEffect(() => { load() }, [])
+  const loadPendingReady = async () => {
+    try {
+      const res = await fetch('/api/import/pending-ready')
+      if (res.ok) {
+        const data = await res.json()
+        setPendingReady(data.files || [])
+      }
+    } catch {}
+  }
+
+  useEffect(() => { load(); loadPendingReady() }, [])
 
   const deleteOne = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -84,6 +97,29 @@ export default function ImportPage() {
       </div>
 
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Banner: archivos pendientes con datos listos para analizar */}
+        {pendingReady.length > 0 && (
+          <div style={{ padding: '14px 16px', background: 'rgba(200,255,0,0.06)', border: '1px solid rgba(200,255,0,0.25)', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ fontSize: '24px', flexShrink: 0 }}>📂</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#C8FF00', fontFamily: 'Syne, sans-serif', marginBottom: '2px' }}>
+                {pendingReady.length} {isEs ? 'archivo(s) listo(s) para analizar' : 'file(s) ready to analyze'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#666', fontFamily: 'DM Mono, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {pendingReady[0].original_filename}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const first = pendingReady[0]
+                setSelected({ id: first.id, original_filename: first.original_filename, file_type: 'image', import_status: 'pending', extraction_confidence: null, uploaded_at: first.uploaded_at })
+              }}
+              style={{ padding: '8px 14px', background: '#C8FF00', border: 'none', borderRadius: '8px', color: '#0A0A0F', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Syne, sans-serif', flexShrink: 0 }}
+            >
+              {isEs ? 'Analizar' : 'Analyze'}
+            </button>
+          </div>
+        )}
         <SmartImporter locale={locale} onComplete={load} />
         <ImportCard locale={locale} onImportComplete={load} />
 

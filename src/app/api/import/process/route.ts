@@ -164,38 +164,42 @@ export async function POST(request: Request) {
       .update({ import_status: 'processing' })
       .eq('id', importedFileId)
 
-    // Download from storage — try stored path first, then fallback variations
+    // Download from storage — try multiple paths for resilience
     let fileData: any = null
+    const storagePath = importedFile.storage_path as string
+    const pathsToTry = [
+      storagePath,
+      `imports/${storagePath}`,
+      storagePath.replace(/^imports\//, ''),
+    ]
 
-    const attempt1 = await (supabase as any)
-      .storage.from('imports').download(importedFile.storage_path)
-    console.error('[import/process] attempt1 path:', importedFile.storage_path, 'error:', JSON.stringify(attempt1.error))
-
-    if (attempt1.data) {
-      fileData = attempt1.data
-    } else {
-      // Fallback: try just the filename (no folder prefix)
-      const pathParts = (importedFile.storage_path as string).split('/')
-      const filename = pathParts[pathParts.length - 1]
-      const attempt2 = await (supabase as any)
-        .storage.from('imports').download(filename)
-      console.error('[import/process] attempt2 path:', filename, 'error:', JSON.stringify(attempt2.error))
-      if (attempt2.data) {
-        fileData = attempt2.data
+    for (const tryPath of pathsToTry) {
+      const { data, error } = await (supabase as any)
+        .storage.from('imports').download(tryPath)
+      if (data && !error) {
+        fileData = data
+        break
       }
+      console.log(`[import/process] path failed: ${tryPath}`, error?.message)
     }
 
     if (!fileData) {
+      const prefix = storagePath.split('/')[0]
+      const { data: listData } = await (supabase as any)
+        .storage.from('imports').list(prefix, { limit: 10 })
+      console.log(`[import/process] bucket/${prefix} contents:`, JSON.stringify(listData?.map((f: any) => f.name)))
+
       await (supabase as any)
         .from('imported_files')
         .update({
           import_status: 'error',
-          extraction_notes: `Download failed. Path: ${importedFile.storage_path}. File may not exist in storage — please re-upload.`
+          extraction_notes: `File not found in storage. Tried paths: ${pathsToTry.join(', ')}`
         })
         .eq('id', importedFileId)
       return NextResponse.json({
         error: 'Failed to download file from storage',
-        storagePath: importedFile.storage_path,
+        storagePath,
+        pathsTried: pathsToTry,
         hint: 'File may not exist in storage. Re-upload the file.'
       }, { status: 500 })
     }

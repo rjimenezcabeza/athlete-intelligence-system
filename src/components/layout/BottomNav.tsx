@@ -30,7 +30,7 @@ const UserIcon = () => (
 
 const NAV = [
   { href: 'dashboard', Icon: HomeIcon, es: 'Inicio', en: 'Home' },
-  { href: 'import', Icon: UploadIcon, es: 'Importar', en: 'Import' },
+  { href: 'athlete', Icon: UserIcon, es: 'Atleta', en: 'Athlete' },
   { href: 'session/new', Icon: PlusIcon, es: null, en: null, primary: true },
   { href: 'history', Icon: ClockIcon, es: 'Historial', en: 'History' },
   { href: 'profile', Icon: UserIcon, es: 'Perfil', en: 'Profile' },
