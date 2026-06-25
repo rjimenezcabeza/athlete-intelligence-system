@@ -63,10 +63,23 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
 
       const uploadRes = await fetch(signedUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': file.type },
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream'
+        },
         body: file
       })
-      if (!uploadRes.ok) throw new Error('Failed to upload file')
+      if (!uploadRes.ok) {
+        const errText = await uploadRes.text().catch(() => '')
+        console.error('[SmartImporter] Upload failed:', uploadRes.status, errText)
+        throw new Error(`Upload failed: ${uploadRes.status}`)
+      }
+
+      // Confirm file_size_bytes in DB after successful upload
+      await fetch('/api/import/update-size', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ importedFileId: fileId, fileSizeBytes: file.size })
+      }).catch(() => {})
 
       fetch('/api/import/process', {
         method: 'POST',
