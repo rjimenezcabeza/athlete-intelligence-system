@@ -37,7 +37,7 @@ export function ThemeProvider({
   useEffect(() => {
     applyAccent(accentColor)
     document.documentElement.setAttribute('data-theme', uiTheme)
-  }, [])
+  }, [accentColor, uiTheme])
 
   const setAccentColor = (color: string) => {
     setAccentColorState(color)

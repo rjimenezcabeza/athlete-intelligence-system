@@ -210,11 +210,27 @@ export async function POST(request: Request) {
     let extractedData: any = null
     let extractionNotes = ''
 
-    const filename = importedFile.original_filename || ''
-    const ext = filename.split('.').pop()?.toLowerCase() ?? ''
-    const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'].includes(ext)
-    const isPDF = ext === 'pdf'
-    const isExcel = ['xlsx', 'xls', 'xlsm', 'xlsb', 'csv'].includes(ext) || importedFile.file_type === 'excel'
+    const filename = (importedFile.original_filename || '').toLowerCase()
+    const fileType = (importedFile.file_type || '').toLowerCase()
+    const ext = filename.split('.').pop() || ''
+
+    const isImage = fileType === 'image'
+      || fileType.startsWith('image/')
+      || ['jpg', 'jpeg', 'png', 'webp', 'heic', 'gif', 'bmp'].includes(ext)
+
+    const isPDF = fileType.includes('pdf') || ext === 'pdf'
+
+    const isExcel = fileType === 'excel'
+      || fileType.includes('spreadsheet')
+      || fileType.includes('excel')
+      || ['xlsx', 'xls', 'xlsm', 'xlsb', 'csv'].includes(ext)
+
+    const getImageMimeType = (): 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' => {
+      if (ext === 'png') return 'image/png'
+      if (ext === 'webp') return 'image/webp'
+      if (ext === 'gif') return 'image/gif'
+      return 'image/jpeg'
+    }
 
     try {
       let messageContent: any[]

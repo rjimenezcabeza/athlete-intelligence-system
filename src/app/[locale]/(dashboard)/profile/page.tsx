@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { PushNotificationToggle } from '@/components/settings/PushNotificationToggle'
 import { WearablesPanel } from '@/components/settings/WearablesPanel'
 import { AvatarUpload } from '@/components/profile/AvatarUpload'
-import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
 
@@ -58,8 +58,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [focusField, setFocusField] = useState<string | null>(null)
-  const [accentColor, setAccentColor] = useState('#C8FF00')
-  const [uiTheme, setUiTheme] = useState('dark')
+  const { accentColor, setAccentColor, uiTheme, setUiTheme } = useTheme()
 
   // Daily log state
   const [dailyForm, setDailyForm] = useState<any>({ weight: '', energy: '', sleep: '', stress: '', notes: '' })
@@ -76,8 +75,6 @@ export default function ProfilePage() {
   const [deleting, setDeleting] = useState(false)
 
   const handleUpdateProfile = async (updates: Record<string, any>) => {
-    if (updates.accent_color) setAccentColor(updates.accent_color)
-    if (updates.ui_theme) setUiTheme(updates.ui_theme)
     setProfile((p: any) => ({ ...p, ...updates }))
     try {
       await fetch('/api/profile/me', {
@@ -93,8 +90,6 @@ export default function ProfilePage() {
       if (d.profile) {
         setProfile(d.profile)
         setForm(d.profile)
-        if (d.profile.accent_color) setAccentColor(d.profile.accent_color)
-        if (d.profile.ui_theme) setUiTheme(d.profile.ui_theme)
       }
     })
     fetch('/api/daily-log').then(r => r.json()).then(d => setDailyLogs(d.logs ?? []))
@@ -174,7 +169,6 @@ export default function ProfilePage() {
   const isPro = profile.subscription_tier === 'pro'
 
   return (
-    <ThemeProvider initialAccent={accentColor} initialTheme={uiTheme}>
     <div style={{ minHeight: '100vh', background: BG, color: T1, paddingBottom: 96 }}>
       <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
@@ -475,7 +469,7 @@ export default function ProfilePage() {
                 ].map(({ color, name }) => (
                   <button
                     key={color}
-                    onClick={() => handleUpdateProfile({ accent_color: color })}
+                    onClick={() => setAccentColor(color)}
                     title={name}
                     style={{
                       width: 36, height: 36, borderRadius: '50%', background: color,
@@ -502,7 +496,7 @@ export default function ProfilePage() {
                 ].map(theme => (
                   <button
                     key={theme.value}
-                    onClick={() => handleUpdateProfile({ ui_theme: theme.value })}
+                    onClick={() => setUiTheme(theme.value)}
                     style={{
                       padding: 10, background: theme.bg,
                       border: `1px solid ${uiTheme === theme.value ? accentColor : 'rgba(255,255,255,0.1)'}`,
@@ -599,7 +593,7 @@ export default function ProfilePage() {
             {/* App version */}
             <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, fontSize: 11, color: '#444', fontFamily: 'DM Mono, monospace', display: 'flex', justifyContent: 'space-between' }}>
               <span>AIS v1.0.0</span>
-              <span>Sprints A–K</span>
+              <span>Sprints A–N</span>
             </div>
           </div>
         </div>
@@ -673,6 +667,5 @@ export default function ProfilePage() {
         </div>
       )}
     </div>
-    </ThemeProvider>
   )
 }

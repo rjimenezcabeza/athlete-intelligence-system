@@ -178,6 +178,20 @@ CRITICAL RULE: Never respond with generic advice if you have specific data. ALWA
 // POST /api/coach/chat
 // Body: { message: string, conversation_history?: Array<{role, content}> }
 export async function POST(request: Request) {
+  const apiKey = (process.env.ANTHROPIC_API_KEY ?? '').trim()
+  if (!apiKey) {
+    const errStream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder()
+        const msg = 'El Coach AI no está disponible porque la API key no está configurada en el servidor. Contacta al administrador.'
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: msg })}\n\n`))
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
+      }
+    })
+    return new Response(errStream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } })
+  }
+
   const cookieStore = await cookies()
   const supabase = createServerClient(
     (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
