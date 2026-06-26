@@ -39,11 +39,22 @@ export default function DashboardPage() {
       .catch(() => setLoading(false))
   }, [])
 
+  const lastSessionDays = (() => {
+    if (!data) return null
+    const sessions = data?.recentSessions?.filter((s: any) => s.status !== 'daily_log')
+    if (!sessions?.length) return null
+    const last = new Date(sessions[0].session_date + 'T12:00:00')
+    const diff = Math.floor((Date.now() - last.getTime()) / 86400000)
+    if (diff === 0) return isEs ? 'Hoy' : 'Today'
+    if (diff === 1) return isEs ? 'Ayer' : 'Yesterday'
+    return `${diff}d`
+  })()
+
   const kpis = [
     { label: isEs ? 'RACHA' : 'STREAK', value: data?.stats?.streak ?? 0, unit: 'd', sub: isEs ? 'dias seguidos' : 'consecutive', accent: (data?.stats?.streak ?? 0) >= 3 },
     { label: isEs ? 'SESIONES' : 'SESSIONS', value: data?.stats?.totalSessions ?? 0, unit: '', sub: isEs ? 'completadas' : 'completed', accent: false },
     { label: isEs ? 'MEDIA' : 'AVG', value: data?.stats?.avgDuration ?? null, unit: 'min', sub: isEs ? 'por sesion' : 'per session', accent: false },
-    { label: 'PLAN', value: data?.profile?.subscription_tier === 'pro' ? 'Pro' : 'Free', unit: '', sub: '', accent: data?.profile?.subscription_tier === 'pro' },
+    { label: isEs ? 'ÚLTIMA' : 'LAST', value: lastSessionDays ?? '—', unit: '', sub: isEs ? 'sesión' : 'session', accent: false },
   ]
 
   const fb = data?.stats?.avgFeedback
@@ -131,7 +142,7 @@ export default function DashboardPage() {
         </Link>
 
         {/* Recharts AreaChart — Volumen Semanal */}
-        {!loading && data?.weeklyChart?.length > 1 && (
+        {!loading && data?.weeklyChart?.length > 0 && (
           <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '18px 16px' }}>
             <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3, marginBottom: 14 }}>
               {isEs ? 'VOLUMEN SEMANAL (kg)' : 'WEEKLY VOLUME (kg)'}
@@ -157,7 +168,7 @@ export default function DashboardPage() {
         )}
 
         {/* Empty state chart */}
-        {!loading && (!data?.weeklyChart || data.weeklyChart.length === 0) && (
+        {!loading && (!data?.weeklyChart || data.weeklyChart.length === 0) && data?.stats?.totalSessions === 0 && (
           <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '28px 20px', textAlign: 'center' }}>
             <p style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}>📊</p>
             <p style={{ fontSize: 13, color: T3 }}>{isEs ? 'Completa sesiones para ver el gráfico de volumen' : 'Complete sessions to see the volume chart'}</p>

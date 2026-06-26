@@ -118,15 +118,47 @@ export function SessionDetailModal({ sessionId, onClose, locale = 'es', weightUn
                 ))}
               </div>
 
-              {/* Total volume */}
+              {/* Total volume + muscle breakdown */}
               {session.totalVolume > 0 && (
-                <div style={{ padding: '12px 14px', background: 'rgba(200,255,0,0.05)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: '10px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: '#888', fontFamily: 'DM Mono, monospace' }}>
-                    {isEs ? 'Volumen total' : 'Total volume'}
-                  </span>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#C8FF00', fontFamily: 'DM Mono, monospace' }}>
-                    {fmt(session.totalVolume)}
-                  </span>
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ padding: '12px 14px', background: 'rgba(200,255,0,0.05)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '13px', color: '#888', fontFamily: 'DM Mono, monospace' }}>
+                      {isEs ? 'Volumen total' : 'Total volume'}
+                    </span>
+                    <span style={{ fontSize: '16px', fontWeight: '700', color: '#C8FF00', fontFamily: 'DM Mono, monospace' }}>
+                      {fmt(session.totalVolume)}
+                    </span>
+                  </div>
+                  {(() => {
+                    const byMuscle: Record<string, number> = {}
+                    session.exercises.forEach(ex => { byMuscle[ex.muscleGroup] = (byMuscle[ex.muscleGroup] || 0) + ex.totalVolume })
+                    const sorted = Object.entries(byMuscle).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+                    if (sorted.length < 2) return null
+                    const max = sorted[0][1]
+                    return (
+                      <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '10px', color: '#444', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+                          {isEs ? 'Por músculo' : 'By muscle'}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                          {sorted.map(([muscle, vol]) => {
+                            const color = MUSCLE_COLORS[muscle.toLowerCase()] || '#666'
+                            return (
+                              <div key={muscle}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                                  <span style={{ fontSize: '11px', color: '#888', fontFamily: 'DM Mono, monospace' }}>{muscle}</span>
+                                  <span style={{ fontSize: '11px', color, fontFamily: 'DM Mono, monospace' }}>{fmt(vol)}</span>
+                                </div>
+                                <div style={{ height: '4px', borderRadius: '2px', background: '#1a1a2e', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', borderRadius: '2px', background: color, width: ((vol / max) * 100) + '%', transition: 'width 0.5s ease' }} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
 

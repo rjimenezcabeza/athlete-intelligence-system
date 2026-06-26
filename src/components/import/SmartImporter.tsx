@@ -48,43 +48,27 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
     processingStartRef.current = null
 
     try {
-      const signedRes = await fetch('/api/import/signed-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type, fileSizeBytes: file.size })
-      })
-      if (!signedRes.ok) {
-        const err = await signedRes.json().catch(() => ({}))
-        throw new Error(err.message || err.error || 'Failed to get upload URL')
-      }
-      const { signedUrl, importedFileId, importId: fallbackId } = await signedRes.json()
-      const fileId = importedFileId || fallbackId
-      setImportId(fileId)
+      const formData = new FormData()
+      formData.append('file', file)
 
-      const uploadRes = await fetch(signedUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream'
-        },
-        body: file
+      const uploadRes = await fetch('/api/import/upload', {
+        method: 'POST',
+        body: formData
       })
       if (!uploadRes.ok) {
-        const errText = await uploadRes.text().catch(() => '')
-        console.error('[SmartImporter] Upload failed:', uploadRes.status, errText)
-        throw new Error(`Upload failed: ${uploadRes.status}`)
+        const err = await uploadRes.json().catch(() => ({}))
+        if (err.error === 'LIMIT_REACHED') {
+          throw new Error(err.message || (isEs ? 'Límite mensual alcanzado' : 'Monthly limit reached'))
+        }
+        throw new Error(err.message || err.error || 'Upload failed')
       }
-
-      // Confirm file_size_bytes in DB after successful upload
-      await fetch('/api/import/update-size', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ importedFileId: fileId, fileSizeBytes: file.size })
-      }).catch(() => {})
+      const { importedFileId } = await uploadRes.json()
+      setImportId(importedFileId)
 
       fetch('/api/import/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ importedFileId: fileId })
+        body: JSON.stringify({ importedFileId: importedFileId })
       }).catch(() => {})
 
       let attempts = 0
@@ -93,7 +77,7 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
           await fetch('/api/import/reset', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ importedFileId: fileId })
+            body: JSON.stringify({ importedFileId: importedFileId })
           }).catch(() => {})
           setTimedOut(true)
           setErrorMsg(isEs ? 'Timeout: el análisis tardó demasiado. Toca Reintentar.' : 'Timeout: analysis took too long. Tap Retry.')
@@ -102,7 +86,7 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
         }
 
         try {
-          const statusRes = await fetch(`/api/import/status/${fileId}`)
+          const statusRes = await fetch(`/api/import/status/${importedFileId}`)
           if (!statusRes.ok) { setTimeout(pollFn, 2000); return }
           const statusData = await statusRes.json()
 
@@ -112,7 +96,7 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
               await fetch('/api/import/reset', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ importedFileId: fileId })
+                body: JSON.stringify({ importedFileId: importedFileId })
               }).catch(() => {})
               setTimedOut(true)
               setErrorMsg(isEs ? 'El análisis tardó demasiado. Toca Reintentar.' : 'Analysis timed out. Tap Retry.')

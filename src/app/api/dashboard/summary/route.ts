@@ -72,9 +72,37 @@ export async function GET() {
         weekMap[r.week_start].sets += r.sets_count
       })
     }
-    const weeklyChart = Object.entries(weekMap)
+    let weeklyChart = Object.entries(weekMap)
       .sort(([a], [b]) => a.localeCompare(b)).slice(-8)
       .map(([week, d]) => ({ week: week.slice(5), volume: Math.round(d.volume), sets: d.sets }))
+
+    // Fallback: compute from sessions + sets if muscle_group_history is empty
+    if (weeklyChart.length === 0 && sessions && sessions.length > 0) {
+      const { data: setsData } = await (admin as any)
+        .from('sets')
+        .select('weight_kg, reps_completed, logged_at, session_exercises!inner(session_id, training_sessions!inner(athlete_id, session_date))')
+        .eq('session_exercises.training_sessions.athlete_id', aid)
+        .eq('set_type', 'working')
+        .not('weight_kg', 'is', null)
+        .not('reps_completed', 'is', null)
+
+      if (setsData && setsData.length > 0) {
+        const fallbackMap: Record<string, number> = {}
+        setsData.forEach((s: any) => {
+          const date = s.session_exercises?.training_sessions?.session_date
+          if (!date) return
+          const d = new Date(date)
+          const day = d.getDay()
+          const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+          const monday = new Date(d.setDate(diff))
+          const weekKey = monday.toISOString().slice(0, 10)
+          fallbackMap[weekKey] = (fallbackMap[weekKey] || 0) + (s.weight_kg || 0) * (s.reps_completed || 0)
+        })
+        weeklyChart = Object.entries(fallbackMap)
+          .sort(([a], [b]) => a.localeCompare(b)).slice(-8)
+          .map(([week, vol]) => ({ week: week.slice(5), volume: Math.round(vol), sets: 0 }))
+      }
+    }
 
     const { data: patterns } = await (admin as any)
       .from('athlete_patterns')

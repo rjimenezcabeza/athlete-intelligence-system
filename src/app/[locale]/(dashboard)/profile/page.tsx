@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { PushNotificationToggle } from '@/components/settings/PushNotificationToggle'
 import { WearablesPanel } from '@/components/settings/WearablesPanel'
 import { useTheme } from '@/components/providers/ThemeProvider'
+import { MacroPieChart } from '@/components/profile/MacroPieChart'
 
 const BG = '#0A0A0F'
 const CARD = 'rgba(255,255,255,0.03)'
@@ -298,7 +299,7 @@ export default function ProfilePage() {
         {/* Version */}
         <div style={{ padding: '10px 14px', background: CARD, borderRadius: 8, fontSize: 11, color: T3, fontFamily: 'DM Mono, monospace', display: 'flex', justifyContent: 'space-between' }}>
           <span>AIS v1.0.0</span>
-          <span>Sprints A–O</span>
+          <span>Sprints A–P</span>
         </div>
       </div>
     </div>
@@ -511,18 +512,7 @@ export default function ProfilePage() {
                     <span style={{ fontSize: 24, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: '#fff' }}>{cal}<span style={{ fontSize: 13, color: T3 }}>  kcal</span></span>
                   </div>
                   {(prot || carbs || fat) && (
-                    <>
-                      <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', gap: 1, marginBottom: 8 }}>
-                        {protKcal > 0 && <div style={{ flex: protKcal, background: '#60A5FA' }} />}
-                        {carbKcal > 0 && <div style={{ flex: carbKcal, background: accentColor }} />}
-                        {fatKcal > 0 && <div style={{ flex: fatKcal, background: '#F97316' }} />}
-                      </div>
-                      <div style={{ display: 'flex', gap: 14 }}>
-                        {prot > 0 && <span style={{ fontSize: 11, color: '#60A5FA', fontFamily: 'DM Mono, monospace' }}>P {prot}g</span>}
-                        {carbs > 0 && <span style={{ fontSize: 11, color: accentColor, fontFamily: 'DM Mono, monospace' }}>C {carbs}g</span>}
-                        {fat > 0 && <span style={{ fontSize: 11, color: '#F97316', fontFamily: 'DM Mono, monospace' }}>F {fat}g</span>}
-                      </div>
-                    </>
+                    <MacroPieChart proteinG={prot} carbsG={carbs} fatG={fat} accentColor={accentColor} size={80} />
                   )}
                 </div>
               )}
