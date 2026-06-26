@@ -123,20 +123,29 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: BG, paddingBottom: 96 }}>
 
-      {/* Header */}
+      {/* Header — inspired by Whoop's progressive greeting */}
       <div className="fade-in" style={{ padding: '28px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3, marginBottom: 6 }}>
-            {isEs ? 'BIENVENIDO DE VUELTA' : 'WELCOME BACK'}
+          <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, letterSpacing: '0.08em', color: T3, marginBottom: 6 }}>
+            {(() => {
+              const h = new Date().getHours()
+              const greeting = h < 12
+                ? (isEs ? 'Buenos días' : 'Good morning')
+                : h < 20
+                  ? (isEs ? 'Buenas tardes' : 'Good afternoon')
+                  : (isEs ? 'Buenas noches' : 'Good evening')
+              const today = new Date().toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })
+              return `${greeting} · ${today}`
+            })()}
           </p>
           {loading ? <Skel w={160} h={32} /> : (
-            <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 28, fontWeight: 700, color: T1, lineHeight: 1.1 }}>
+            <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 26, fontWeight: 700, color: T1, lineHeight: 1.1 }}>
               {data?.profile?.display_name ?? 'Atleta'}
             </h1>
           )}
         </div>
         {!loading && data?.profile?.subscription_tier === 'pro' && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', fontFamily: 'Syne, sans-serif', background: 'rgba(200,255,0,0.15)', color: ACC, border: '1px solid rgba(200,255,0,0.3)' }}>PRO</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', fontFamily: 'DM Mono, monospace', background: 'rgba(200,255,0,0.08)', color: T3, border: '1px solid rgba(255,255,255,0.08)' }}>PRO</span>
         )}
       </div>
 
@@ -184,15 +193,15 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* CTA Entrenar */}
+        {/* CTA Entrenar — inspirado en Strong App: compacto y claro */}
         <Link href={'/' + locale + '/session/new'} className="fade-in s2" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          background: 'linear-gradient(135deg,#C8FF00 0%,#88DD00 100%)',
-          color: BG, borderRadius: 18, padding: '20px',
-          fontFamily: 'Syne, sans-serif', fontSize: 17, fontWeight: 800,
-          letterSpacing: '0.03em', boxShadow: '0 4px 24px rgba(200,255,0,0.3)'
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          background: ACC,
+          color: BG, borderRadius: 14, padding: '15px 20px',
+          fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 800,
+          letterSpacing: '0.02em'
         }}>
-          <span style={{ fontSize: 22 }}>+</span>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
           {isEs ? 'Entrenar ahora' : 'Train now'}
         </Link>
 

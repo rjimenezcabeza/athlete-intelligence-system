@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PushNotificationToggle } from '@/components/settings/PushNotificationToggle'
 import { WearablesPanel } from '@/components/settings/WearablesPanel'
-import { useTheme } from '@/components/providers/ThemeProvider'
+import { useTheme, PALETTES } from '@/components/providers/ThemeProvider'
 import { MacroPieChart } from '@/components/profile/MacroPieChart'
 
 const BG = '#0A0A0F'
@@ -81,7 +81,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const locale = (params?.locale as string) ?? 'es'
   const isEs = locale === 'es'
-  const { accentColor, setAccentColor, uiTheme, setUiTheme } = useTheme()
+  const { accentColor, setAccentColor, uiTheme, setUiTheme, activePaletteId, setPalette } = useTheme()
 
   const [view, setView] = useState<View>('main')
   const [profile, setProfile] = useState<any>(null)
@@ -239,28 +239,57 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Color de acento */}
+        {/* Paletas de color */}
         <div>
-          <SectionLabel>{isEs ? 'Color de acento' : 'Accent color'}</SectionLabel>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {ACCENT_COLORS.map(({ color, name }) => (
-              <button key={color} onClick={() => setAccentColor(color)} title={name}
-                style={{ width: 36, height: 36, borderRadius: '50%', background: color, border: accentColor === color ? '3px solid #fff' : '3px solid transparent', cursor: 'pointer', outline: 'none', boxShadow: accentColor === color ? `0 0 0 2px ${color}40` : 'none', transition: 'all 0.2s' }} />
-            ))}
+          <SectionLabel>{isEs ? 'Paleta de colores' : 'Color palette'}</SectionLabel>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {PALETTES.map(palette => {
+              const isActive = activePaletteId === palette.id
+              return (
+                <button key={palette.id} onClick={() => setPalette(palette)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: isActive ? `${palette.accent}10` : CARD, border: `1px solid ${isActive ? palette.accent + '50' : BORDER}`, borderRadius: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s' }}>
+                  {/* Mini preview */}
+                  <div style={{ width: 44, height: 36, borderRadius: 8, background: palette.bg, border: `1px solid ${palette.cardBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', inset: 0, background: palette.card }} />
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: palette.accent, position: 'relative', zIndex: 1 }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: isActive ? palette.accent : T1, fontFamily: 'Syne, sans-serif', marginBottom: 2 }}>{palette.name}</p>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[palette.accent, palette.bg, palette.textPrimary].map(c => (
+                        <div key={c} style={{ width: 12, height: 12, borderRadius: 3, background: c, border: '1px solid rgba(255,255,255,0.1)' }} />
+                      ))}
+                    </div>
+                  </div>
+                  {isActive && <span style={{ fontSize: 14, color: palette.accent }}>✓</span>}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Tema */}
+        {/* Color de acento personalizado */}
         <div>
-          <SectionLabel>{isEs ? 'Tema base' : 'Base theme'}</SectionLabel>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
-            {THEMES.map(theme => (
-              <button key={theme.value} onClick={() => setUiTheme(theme.value)}
-                style={{ padding: 10, background: theme.bg, border: `1px solid ${uiTheme === theme.value ? accentColor : BORDER}`, borderRadius: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6, transition: 'all 0.15s' }}>
-                <div style={{ width: '100%', height: 16, borderRadius: 4, background: theme.preview }} />
-                <span style={{ fontSize: 11, color: uiTheme === theme.value ? accentColor : T3, fontFamily: 'DM Mono, monospace' }}>{theme.label}</span>
-              </button>
-            ))}
+          <SectionLabel>{isEs ? 'Color personalizado' : 'Custom accent'}</SectionLabel>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="color"
+                value={accentColor}
+                onChange={e => setAccentColor(e.target.value)}
+                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer', padding: 2, background: 'none', appearance: 'none' }}
+              />
+            </div>
+            <div>
+              <p style={{ fontSize: 13, color: T1, fontFamily: 'DM Mono, monospace', marginBottom: 2 }}>{accentColor.toUpperCase()}</p>
+              <p style={{ fontSize: 11, color: T3 }}>{isEs ? 'Solo cambia el color de acento' : 'Changes accent color only'}</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 4 }}>
+              {ACCENT_COLORS.map(({ color, name }) => (
+                <button key={color} onClick={() => setAccentColor(color)} title={name}
+                  style={{ width: 28, height: 28, borderRadius: '50%', background: color, border: accentColor === color ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer', outline: 'none', boxShadow: accentColor === color ? `0 0 0 2px ${color}50` : 'none', transition: 'all 0.2s' }} />
+              ))}
+            </div>
           </div>
         </div>
 

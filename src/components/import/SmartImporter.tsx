@@ -47,13 +47,34 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
     setTimedOut(false)
     processingStartRef.current = null
 
+    // Validate size client-side before upload
+    if (file.size > 3 * 1024 * 1024) {
+      setErrorMsg(isEs ? 'Archivo demasiado grande. Máximo 3MB.' : 'File too large. Maximum 3MB.')
+      setStep('error')
+      return
+    }
+
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      // Convert to base64 for reliable upload (avoids FormData/multipart issues on Vercel)
+      const arrayBuffer = await file.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binaryStr = ''
+      // Process in chunks to avoid call stack overflow on large files
+      const chunkSize = 8192
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        binaryStr += String.fromCharCode(...uint8Array.subarray(i, i + chunkSize))
+      }
+      const base64 = btoa(binaryStr)
 
       const uploadRes = await fetch('/api/import/upload', {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          fileSizeBytes: file.size,
+          data: base64
+        })
       })
       if (!uploadRes.ok) {
         const err = await uploadRes.json().catch(() => ({}))
@@ -284,7 +305,7 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
               {isEs ? 'o haz clic para seleccionar' : 'or click to select'}
             </div>
             <div style={{ fontSize: '11px', color: '#444', fontFamily: 'DM Mono, monospace' }}>
-              PDF, {isEs ? 'imagen' : 'image'}, Excel, Word {isEs ? 'o texto' : 'or text'}
+              PDF, {isEs ? 'imagen' : 'image'}, Excel, Word {isEs ? 'o texto' : 'or text'} · max 3MB
             </div>
             <input type="file" style={{ display: 'none' }}
               accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.txt,.csv"

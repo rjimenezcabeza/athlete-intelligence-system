@@ -179,60 +179,120 @@ export default function HistoryPage() {
             </Link>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, ...animStyle(160) }}>
-            {filtered.map(s => {
-              const date = new Date(s.session_date)
-              const label = date.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' })
-              const isExp = expanded === s.id
-              return (
-                <div key={s.id} style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 16, overflow: 'hidden' }}>
-                  <button style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', minHeight: 56 }}
-                    onClick={() => setExpanded(isExp ? null : s.id)}>
-                    <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(200,255,0,0.08)', color: ACC, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-                      {date.getDate()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontWeight: 600, fontSize: 14, color: T1, textTransform: 'capitalize', fontFamily: 'Syne, sans-serif', marginBottom: 2 }}>{label}</p>
-                      <p style={{ fontSize: 11, color: T3 }}>
-                        {s.duration_minutes ? `${s.duration_minutes}min` : '—'}
-                        {s.day_label ? ` · ${s.day_label}` : ''}
-                      </p>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                      {s.pump_rating    != null && <span style={{ fontSize: 12, fontWeight: 700, color: ACC, fontFamily: 'DM Mono, monospace' }}>{s.pump_rating}</span>}
-                      {s.local_fatigue  != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B6B', fontFamily: 'DM Mono, monospace' }}>{s.local_fatigue}</span>}
-                      {s.perceived_recovery != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#4ECDC4', fontFamily: 'DM Mono, monospace' }}>{s.perceived_recovery}</span>}
-                      <span style={{ color: T3, fontSize: 16, transform: isExp ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>›</span>
-                    </div>
-                  </button>
-                  {isExp && (
-                    <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
-                        {[
-                          { label: 'Pump', value: s.pump_rating ?? '—', color: ACC },
-                          { label: isEs ? 'Fatiga' : 'Fatigue', value: s.local_fatigue ?? '—', color: '#FF6B6B' },
-                          { label: isEs ? 'Recuper.' : 'Recovery', value: s.perceived_recovery ?? '—', color: '#4ECDC4' },
-                          { label: isEs ? 'Duración' : 'Duration', value: s.duration_minutes ? `${s.duration_minutes}m` : '—', color: T1 },
-                        ].map(m => (
-                          <div key={m.label}>
-                            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T3, marginBottom: 3 }}>{m.label}</p>
-                            <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => setSelectedSessionId(s.id)} style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#16161f', color: T2, border: '1px solid ' + BORDER, cursor: 'pointer' }}>
-                          {isEs ? 'Ver detalle →' : 'View detail →'}
-                        </button>
-                        <button onClick={() => setDeleteModal(s)} style={{ padding: '10px 14px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.08)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.15)', cursor: 'pointer' }}>
-                          {isEs ? 'Eliminar' : 'Delete'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, ...animStyle(160) }}>
+            {/* Group by week — Hevy-style */}
+            {(() => {
+              const getWeekKey = (dateStr: string) => {
+                const d = new Date(dateStr)
+                const mon = new Date(d)
+                mon.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+                return mon.toISOString().split('T')[0]
+              }
+              const getWeekLabel = (weekKey: string) => {
+                const mon = new Date(weekKey + 'T12:00:00Z')
+                const nowKey = getWeekKey(new Date().toISOString().split('T')[0])
+                if (weekKey === nowKey) return isEs ? 'Esta semana' : 'This week'
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+                const fmtMon = mon.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+                const fmtSun = sun.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+                return `${fmtMon} – ${fmtSun}`
+              }
+              // Build ordered week groups
+              const weekGroups: { key: string; label: string; sessions: SessionRow[] }[] = []
+              const weekMap = new Map<string, SessionRow[]>()
+              for (const s of filtered) {
+                const wk = getWeekKey(s.session_date)
+                if (!weekMap.has(wk)) weekMap.set(wk, [])
+                weekMap.get(wk)!.push(s)
+              }
+              for (const [k, sessions] of weekMap) weekGroups.push({ key: k, label: getWeekLabel(k), sessions })
+              weekGroups.sort((a, b) => b.key.localeCompare(a.key))
+
+              return weekGroups.map(wg => (
+                <div key={wg.key} style={{ marginBottom: 8 }}>
+                  {/* Week header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 4px', marginBottom: 6 }}>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: T3 }}>
+                      {wg.label}
+                    </span>
+                    <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: T3 }}>
+                      {wg.sessions.length} {isEs ? 'sesiones' : 'sessions'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {wg.sessions.map(s => {
+                      const date = new Date(s.session_date)
+                      const label = date.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'short' })
+                      const isExp = expanded === s.id
+                      // Determine split type tag color
+                      const dayLabelLower = (s.day_label ?? '').toLowerCase()
+                      const tagColor = dayLabelLower.includes('push') ? '#FF6B35'
+                        : dayLabelLower.includes('pull') ? '#00D4FF'
+                        : dayLabelLower.includes('leg') || dayLabelLower.includes('pier') ? '#A855F7'
+                        : ACC
+                      return (
+                        <div key={s.id} style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 14, overflow: 'hidden' }}>
+                          <button style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}
+                            onClick={() => setExpanded(isExp ? null : s.id)}>
+                            {/* Date badge */}
+                            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, fontSize: 14, color: T1, lineHeight: 1 }}>{date.getDate()}</span>
+                              <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 8, color: T3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                {date.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'short' }).slice(0, 3)}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                                <p style={{ fontWeight: 600, fontSize: 13, color: T1, fontFamily: 'Syne, sans-serif', textTransform: 'capitalize' }}>{label}</p>
+                                {s.day_label && (
+                                  <span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: tagColor, background: tagColor + '15', borderRadius: 4, padding: '2px 6px', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>
+                                    {s.day_label}
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ fontSize: 11, color: T3, fontFamily: 'DM Mono, monospace' }}>
+                                {s.duration_minutes ? `${s.duration_minutes}min` : '—'}
+                              </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                              {s.pump_rating    != null && <span style={{ fontSize: 12, fontWeight: 700, color: ACC, fontFamily: 'DM Mono, monospace' }}>{s.pump_rating}</span>}
+                              {s.local_fatigue  != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B6B', fontFamily: 'DM Mono, monospace' }}>{s.local_fatigue}</span>}
+                              {s.perceived_recovery != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#4ECDC4', fontFamily: 'DM Mono, monospace' }}>{s.perceived_recovery}</span>}
+                              <span style={{ color: T3, fontSize: 16, transform: isExp ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>›</span>
+                            </div>
+                          </button>
+                          {isExp && (
+                            <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
+                                {[
+                                  { label: 'Pump', value: s.pump_rating ?? '—', color: ACC },
+                                  { label: isEs ? 'Fatiga' : 'Fatigue', value: s.local_fatigue ?? '—', color: '#FF6B6B' },
+                                  { label: isEs ? 'Recuper.' : 'Recovery', value: s.perceived_recovery ?? '—', color: '#4ECDC4' },
+                                  { label: isEs ? 'Duración' : 'Duration', value: s.duration_minutes ? `${s.duration_minutes}m` : '—', color: T1 },
+                                ].map(m => (
+                                  <div key={m.label}>
+                                    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T3, marginBottom: 3 }}>{m.label}</p>
+                                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}</p>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button onClick={() => setSelectedSessionId(s.id)} style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#16161f', color: T2, border: '1px solid ' + BORDER, cursor: 'pointer' }}>
+                                  {isEs ? 'Ver detalle →' : 'View detail →'}
+                                </button>
+                                <button onClick={() => setDeleteModal(s)} style={{ padding: '10px 14px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.08)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.15)', cursor: 'pointer' }}>
+                                  {isEs ? 'Eliminar' : 'Delete'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-              )
-            })}
+              ))
+            })()}
           </div>
         )}
       </div>

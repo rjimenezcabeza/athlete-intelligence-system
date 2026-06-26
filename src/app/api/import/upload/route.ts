@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-export const maxDuration = 10
+export const maxDuration = 30
 
 export async function POST(request: Request) {
   try {
@@ -42,38 +42,49 @@ export async function POST(request: Request) {
       }
     }
 
-    // Parse FormData with error handling
-    let file: File | null = null
+    // Parse JSON body with base64 data
     let filename = 'import'
     let contentType = 'application/octet-stream'
-    let fileSize = 0
     let buffer: Buffer
 
+    console.log('[upload] Parsing JSON body...')
     try {
-      const formData = await request.formData()
-      file = formData.get('file') as File
-      if (file) {
-        filename = file.name
-        contentType = file.type || 'application/octet-stream'
-        fileSize = file.size
-        const arrayBuffer = await file.arrayBuffer()
-        buffer = Buffer.from(arrayBuffer)
-      } else {
-        return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      const body = await request.json()
+      const { filename: fn, contentType: ct, fileSizeBytes, data } = body
+
+      console.log('[upload] Body received:', { filename: fn, contentType: ct, fileSizeBytes, hasData: !!data, dataLength: data?.length })
+
+      if (!data || !fn) {
+        return NextResponse.json({ error: 'Missing file data or filename' }, { status: 400 })
       }
-    } catch (formErr) {
-      console.error('[upload] FormData parse error:', formErr)
-      return NextResponse.json({ error: 'Could not parse file upload', details: String(formErr) }, { status: 400 })
+
+      filename = fn
+      contentType = ct || 'application/octet-stream'
+
+      // Validate size BEFORE decoding (base64 is ~33% larger than binary)
+      const estimatedSize = fileSizeBytes || Math.round(data.length * 0.75)
+      if (estimatedSize > 3 * 1024 * 1024) {
+        return NextResponse.json({
+          error: 'FILE_TOO_LARGE',
+          message: 'Máximo 3MB por archivo. Comprime el archivo o usa uno más pequeño.'
+        }, { status: 413 })
+      }
+
+      buffer = Buffer.from(data, 'base64')
+      console.log('[upload] Buffer decoded, size:', buffer.byteLength)
+    } catch (parseErr) {
+      console.error('[upload] JSON parse error:', parseErr)
+      return NextResponse.json({ error: 'Could not parse request body', details: String(parseErr) }, { status: 400 })
     }
 
-    if (!buffer! || buffer.byteLength === 0) {
+    if (!buffer || buffer.byteLength === 0) {
       return NextResponse.json({ error: 'File is empty' }, { status: 400 })
     }
 
-    if (buffer.byteLength > 4 * 1024 * 1024) {
+    if (buffer.byteLength > 3 * 1024 * 1024) {
       return NextResponse.json({
         error: 'FILE_TOO_LARGE',
-        message: 'El archivo supera el límite de 4MB'
+        message: 'Máximo 3MB por archivo.'
       }, { status: 413 })
     }
 

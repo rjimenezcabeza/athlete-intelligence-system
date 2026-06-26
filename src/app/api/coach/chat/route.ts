@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import Anthropic from '@anthropic-ai/sdk'
 
+export const maxDuration = 60
+
 const anthropic = new Anthropic({
   apiKey: (process.env.ANTHROPIC_API_KEY ?? '').trim(),
 })
@@ -414,6 +416,8 @@ export async function POST(request: Request) {
 
   const readable = new ReadableStream({
     async start(controller) {
+      // Send immediate ACK to prevent Vercel 10s cold-start timeout
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'start', text: '' })}\n\n`))
       try {
         const stream = anthropic.messages.stream({
           model: 'claude-sonnet-4-6',

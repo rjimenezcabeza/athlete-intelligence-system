@@ -6,6 +6,9 @@
     "src/app/api/import/process/route.ts": {
       "maxDuration": 60
     },
+    "src/app/api/coach/chat/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/import/signed-url/route.ts": {
       "maxDuration": 10
     },
