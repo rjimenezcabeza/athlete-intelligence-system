@@ -136,9 +136,81 @@ export async function GET() {
       }
     })
 
+    // Historical weekly volume (last 12 weeks) from sessions + sets
+    const twelveWeeksAgo = new Date(now)
+    twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84)
+    const { data: historicSessions } = await (admin as any)
+      .from('training_sessions')
+      .select('id, session_date')
+      .eq('athlete_id', profile.id)
+      .eq('status', 'completed')
+      .gte('session_date', twelveWeeksAgo.toISOString().split('T')[0])
+      .order('session_date', { ascending: true })
+
+    const weekHistoryMap = new Map<string, { volume: number; sessions: number; prs: number }>()
+
+    if (historicSessions && historicSessions.length > 0) {
+      const sessionIds = historicSessions.map((s: any) => s.id)
+
+      // Map session_id -> week
+      const sessionWeekMap: Record<string, string> = {}
+      for (const s of historicSessions) {
+        const d = new Date(s.session_date + 'T12:00:00Z')
+        const dow = d.getUTCDay()
+        const diff = dow === 0 ? -6 : 1 - dow
+        const mon = new Date(d)
+        mon.setUTCDate(d.getUTCDate() + diff)
+        const wk = mon.toISOString().split('T')[0]
+        sessionWeekMap[s.id] = wk
+        if (!weekHistoryMap.has(wk)) weekHistoryMap.set(wk, { volume: 0, sessions: 0, prs: 0 })
+        weekHistoryMap.get(wk)!.sessions++
+      }
+
+      const { data: seData } = await (admin as any)
+        .from('session_exercises')
+        .select('id, session_id')
+        .in('session_id', sessionIds)
+
+      if (seData && seData.length > 0) {
+        const seIds = seData.map((se: any) => se.id)
+        const seToSession: Record<string, string> = {}
+        for (const se of seData) seToSession[se.id] = se.session_id
+
+        const { data: setsData } = await (admin as any)
+          .from('sets')
+          .select('session_exercise_id, weight_kg, reps_completed, is_personal_record, set_type')
+          .in('session_exercise_id', seIds)
+          .eq('set_type', 'working')
+
+        for (const s of (setsData || [])) {
+          const sessionId = seToSession[s.session_exercise_id]
+          const wk = sessionWeekMap[sessionId]
+          if (!wk || !weekHistoryMap.has(wk)) continue
+          const w = weekHistoryMap.get(wk)!
+          w.volume += (Number(s.weight_kg) || 0) * (s.reps_completed || 0)
+          if (s.is_personal_record) w.prs++
+        }
+      }
+    }
+
+    const weeks = Array.from(weekHistoryMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([weekStart, data]) => {
+        const d = new Date(weekStart + 'T12:00:00Z')
+        const weekLabel = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+        return {
+          weekStart,
+          weekLabel,
+          volume: Math.round(data.volume),
+          sessions: data.sessions,
+          prs: data.prs
+        }
+      })
+
     return NextResponse.json({
       weekStart: weekStartStr,
-      muscleVolume: result.sort((a, b) => b.setsThisWeek - a.setsThisWeek)
+      muscleVolume: result.sort((a, b) => b.setsThisWeek - a.setsThisWeek),
+      weeks
     })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })

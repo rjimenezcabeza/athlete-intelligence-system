@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { MuscleVolumeChart } from '@/components/dashboard/MuscleVolumeChart'
 import { MesocycleWidget } from '@/components/dashboard/MesocycleWidget'
 import { MesocycleCreateModal } from '@/components/dashboard/MesocycleCreateModal'
@@ -14,6 +13,56 @@ function Skel({ w = '100%', h = 32 }: { w?: string | number; h?: number }) {
   return <div className="skeleton" style={{ width: w, height: h, borderRadius: 10, flexShrink: 0 }} />
 }
 
+function VolumeBarChart({ weeks, locale }: { weeks: any[]; locale: string }) {
+  if (!weeks || weeks.length === 0) return null
+  const isEs = locale === 'es'
+  const displayWeeks = weeks.slice(-6)
+  const maxVol = Math.max(...displayWeeks.map((w: any) => w.volume), 1)
+  const avg3 = displayWeeks.length >= 1
+    ? Math.round(displayWeeks.slice(-3).reduce((s: number, w: any) => s + w.volume, 0) / Math.min(displayWeeks.slice(-3).length, 3))
+    : 0
+
+  return (
+    <div style={{ padding: '18px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: T3, fontFamily: 'Syne, sans-serif', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+          {isEs ? 'VOLUMEN SEMANAL (kg)' : 'WEEKLY VOLUME (kg)'}
+        </span>
+        <span style={{ fontSize: 10, color: T3, fontFamily: 'DM Mono, monospace' }}>
+          {isEs ? 'últimas 6 sem' : 'last 6 wk'}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80 }}>
+        {displayWeeks.map((week: any, i: number) => {
+          const pct = (week.volume / maxVol) * 100
+          const isLatest = i === displayWeeks.length - 1
+          return (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, height: '100%', justifyContent: 'flex-end' }}>
+              <span style={{ fontSize: 8, color: T3, fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>
+                {week.volume >= 1000 ? `${(week.volume / 1000).toFixed(0)}k` : week.volume}
+              </span>
+              <div style={{ width: '100%', height: `${Math.max(pct, 6)}%`, background: isLatest ? ACC : 'rgba(255,255,255,0.12)', borderRadius: '4px 4px 0 0', transition: 'height 0.5s ease' }} />
+              <span style={{ fontSize: 7, color: '#333', fontFamily: 'DM Mono, monospace', textAlign: 'center', lineHeight: 1.2 }}>{week.weekLabel}</span>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 20, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: ACC, fontFamily: 'DM Mono, monospace' }}>
+            {avg3 >= 1000 ? `${(avg3 / 1000).toFixed(1)}k` : avg3}
+          </div>
+          <div style={{ fontSize: 9, color: T3, fontFamily: 'DM Mono, monospace' }}>{isEs ? 'media 3 sem' : 'avg 3 wk'}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: T1, fontFamily: 'DM Mono, monospace' }}>{weeks.length}</div>
+          <div style={{ fontSize: 9, color: T3, fontFamily: 'DM Mono, monospace' }}>{isEs ? 'semanas' : 'weeks'}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const params = useParams()
   const router = useRouter()
@@ -22,6 +71,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showCreateMeso, setShowCreateMeso] = useState(false)
+  const [volumeWeeks, setVolumeWeeks] = useState<any[]>([])
 
   useEffect(() => {
     fetch('/api/dashboard/summary')
@@ -37,6 +87,11 @@ export default function DashboardPage() {
         }
       })
       .catch(() => setLoading(false))
+
+    fetch('/api/volume/weekly')
+      .then(r => r.json())
+      .then(d => { if (d.weeks?.length > 0) setVolumeWeeks(d.weeks) })
+      .catch(() => {})
   }, [])
 
   const lastSessionDays = (() => {
@@ -141,34 +196,15 @@ export default function DashboardPage() {
           {isEs ? 'Entrenar ahora' : 'Train now'}
         </Link>
 
-        {/* Recharts AreaChart — Volumen Semanal */}
-        {!loading && data?.weeklyChart?.length > 0 && (
-          <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '18px 16px' }}>
-            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3, marginBottom: 14 }}>
-              {isEs ? 'VOLUMEN SEMANAL (kg)' : 'WEEKLY VOLUME (kg)'}
-            </p>
-            <ResponsiveContainer width="100%" height={100}>
-              <AreaChart data={data.weeklyChart} margin={{ top: 4, right: 4, left: -32, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={ACC} stopOpacity={0.25} />
-                    <stop offset="95%" stopColor={ACC} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="week" tick={{ fill: T3, fontSize: 9 }} axisLine={false} tickLine={false} />
-                <YAxis hide domain={['auto', 'auto']} />
-                <Tooltip
-                  contentStyle={{ background: '#16161f', border: '1px solid rgba(200,255,0,0.2)', borderRadius: 10, color: T1, fontSize: 12 }}
-                  formatter={(v: unknown) => [`${v} kg`, isEs ? 'Volumen' : 'Volume']}
-                />
-                <Area type="monotone" dataKey="volume" stroke={ACC} strokeWidth={2} fill="url(#volGrad)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
+        {/* CSS VolumeBarChart — datos reales desde /api/volume/weekly */}
+        {!loading && volumeWeeks.length > 0 && (
+          <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18 }}>
+            <VolumeBarChart weeks={volumeWeeks} locale={locale} />
           </div>
         )}
 
-        {/* Empty state chart */}
-        {!loading && (!data?.weeklyChart || data.weeklyChart.length === 0) && data?.stats?.totalSessions === 0 && (
+        {/* Empty state chart — solo cuando no hay sesiones */}
+        {!loading && volumeWeeks.length === 0 && (data?.stats?.totalSessions ?? 0) === 0 && (
           <div className="fade-in s3" style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '28px 20px', textAlign: 'center' }}>
             <p style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}>📊</p>
             <p style={{ fontSize: 13, color: T3 }}>{isEs ? 'Completa sesiones para ver el gráfico de volumen' : 'Complete sessions to see the volume chart'}</p>

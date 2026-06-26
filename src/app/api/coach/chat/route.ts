@@ -179,6 +179,7 @@ CRITICAL RULE: Never respond with generic advice if you have specific data. ALWA
 // Body: { message: string, conversation_history?: Array<{role, content}> }
 export async function POST(request: Request) {
   const apiKey = (process.env.ANTHROPIC_API_KEY ?? '').trim()
+  console.log('[coach/chat] ANTHROPIC_API_KEY exists:', !!apiKey, '| prefix:', apiKey?.slice(0, 10) || 'MISSING')
   if (!apiKey) {
     const errStream = new ReadableStream({
       start(controller) {

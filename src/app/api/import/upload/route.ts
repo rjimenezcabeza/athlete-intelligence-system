@@ -42,12 +42,35 @@ export async function POST(request: Request) {
       }
     }
 
-    const formData = await request.formData()
-    const file = formData.get('file') as File
+    // Parse FormData with error handling
+    let file: File | null = null
+    let filename = 'import'
+    let contentType = 'application/octet-stream'
+    let fileSize = 0
+    let buffer: Buffer
 
-    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    try {
+      const formData = await request.formData()
+      file = formData.get('file') as File
+      if (file) {
+        filename = file.name
+        contentType = file.type || 'application/octet-stream'
+        fileSize = file.size
+        const arrayBuffer = await file.arrayBuffer()
+        buffer = Buffer.from(arrayBuffer)
+      } else {
+        return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      }
+    } catch (formErr) {
+      console.error('[upload] FormData parse error:', formErr)
+      return NextResponse.json({ error: 'Could not parse file upload', details: String(formErr) }, { status: 400 })
+    }
 
-    if (file.size > 4 * 1024 * 1024) {
+    if (!buffer! || buffer.byteLength === 0) {
+      return NextResponse.json({ error: 'File is empty' }, { status: 400 })
+    }
+
+    if (buffer.byteLength > 4 * 1024 * 1024) {
       return NextResponse.json({
         error: 'FILE_TOO_LARGE',
         message: 'El archivo supera el límite de 4MB'
@@ -59,39 +82,43 @@ export async function POST(request: Request) {
     if (!buckets?.some((b: any) => b.name === 'imports')) {
       await (supabase as any).storage.createBucket('imports', {
         public: false,
-        fileSizeLimit: 10485760
+        fileSizeLimit: 10 * 1024 * 1024
       })
     }
 
     // Detect file type from extension (more reliable than MIME in browser)
-    const filename = file.name
     const ext = filename.split('.').pop()?.toLowerCase() || ''
     let fileType = 'other'
     if (['xlsx', 'xls', 'xlsm', 'xlsb', 'csv'].includes(ext)) fileType = 'excel'
-    else if (['jpg', 'jpeg', 'png', 'webp', 'heic', 'gif', 'bmp'].includes(ext)) fileType = 'image'
-    else if (ext === 'pdf') fileType = 'pdf'
+    else if (['jpg', 'jpeg', 'heic', 'heif'].includes(ext)) fileType = 'image/jpeg'
+    else if (ext === 'png') fileType = 'image/png'
+    else if (ext === 'webp') fileType = 'image/webp'
+    else if (ext === 'gif') fileType = 'image/gif'
+    else if (ext === 'pdf') fileType = 'application/pdf'
     else if (['doc', 'docx'].includes(ext)) fileType = 'word'
     else if (ext === 'txt') fileType = 'text'
+    else if (contentType.startsWith('image/')) fileType = contentType
 
-    const safeName = filename.replace(/[^a-zA-Z0-9._\-]/g, '_')
+    const safeName = filename.replace(/[^a-zA-Z0-9._\-]/g, '_').slice(0, 100)
     const storagePath = `${profile.id}/${Date.now()}_${safeName}`
 
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    console.log('[upload] Uploading:', { path: storagePath, size: buffer.byteLength, type: contentType, ext })
 
     const { error: uploadError } = await (supabase as any)
       .storage
       .from('imports')
       .upload(storagePath, buffer, {
-        contentType: file.type || 'application/octet-stream',
-        upsert: true
+        contentType: contentType,
+        upsert: false,
+        duplex: 'half'
       })
 
     if (uploadError) {
-      console.error('[import/upload] Storage error:', uploadError.message)
+      console.error('[upload] Storage error:', JSON.stringify(uploadError))
       return NextResponse.json({
         error: 'Storage upload failed',
-        details: uploadError.message
+        details: uploadError.message,
+        hint: uploadError.statusCode === '413' ? 'File too large for storage' : undefined
       }, { status: 500 })
     }
 
@@ -102,23 +129,29 @@ export async function POST(request: Request) {
         original_filename: filename,
         file_type: fileType,
         storage_path: storagePath,
-        file_size_bytes: file.size,
+        file_size_bytes: buffer.byteLength,
         import_status: 'pending'
       })
-      .select()
+      .select('id, original_filename, storage_path, file_size_bytes')
       .single()
 
-    if (dbError) throw dbError
+    if (dbError) {
+      console.error('[upload] DB error:', JSON.stringify(dbError))
+      throw dbError
+    }
+
+    console.log('[upload] Success:', importedFile.id, 'size:', buffer.byteLength)
 
     return NextResponse.json({
       ok: true,
       importedFileId: importedFile.id,
       importId: importedFile.id,
       storagePath,
-      fileSizeBytes: file.size
+      fileSizeBytes: buffer.byteLength,
+      filename
     })
   } catch (error) {
-    console.error('[import/upload]', error)
+    console.error('[import/upload] fatal error:', error)
     return NextResponse.json({ error: 'Internal error', details: String(error) }, { status: 500 })
   }
 }
