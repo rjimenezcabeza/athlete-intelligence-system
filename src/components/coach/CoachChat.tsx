@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 
-const BG = '#0A0A0F'
-const CARD = '#111118'
-const ACC = '#C8FF00'
+const BG = 'var(--bg-primary)'
+const CARD = 'var(--card-bg)'
+const ACC = 'var(--accent-color)'
 const T1 = '#F0F0F5'
 const T2 = '#8888AA'
 const T3 = '#44445a'

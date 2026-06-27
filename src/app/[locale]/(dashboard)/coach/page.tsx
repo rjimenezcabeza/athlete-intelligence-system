@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { CoachChat } from '@/components/coach/CoachChat'
 
-const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
+const BG = 'var(--bg-primary)', CARD = 'var(--card-bg)', ACC = 'var(--accent-color)', T1 = 'var(--text-primary)', T2 = 'var(--text-secondary)', T3 = 'var(--text-tertiary)', BORDER = 'var(--card-border)'
 
 export default async function CoachPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params

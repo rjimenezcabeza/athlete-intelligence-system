@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import BottomNav from '@/components/layout/BottomNav'
 import { OfflineIndicator } from '@/components/shared/OfflineIndicator'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { getPaletteById, buildCssVars } from '@/lib/palettes'
 
 export default async function DashboardLayout({
   children,
@@ -28,18 +29,23 @@ export default async function DashboardLayout({
   if (!user) redirect(`/${locale}/login`)
 
   let accentColor = '#C8FF00'
+  let paletteId = 'default'
   try {
     const { data: prof } = await (supabase as any)
       .from('athlete_profiles')
-      .select('accent_color')
+      .select('accent_color, color_palette')
       .eq('user_id', user.id)
       .single()
     if (prof?.accent_color) accentColor = prof.accent_color
+    if (prof?.color_palette) paletteId = prof.color_palette
   } catch {}
 
+  const palette = getPaletteById(paletteId)
+  const cssVars = buildCssVars(palette, accentColor)
+
   return (
-    <ThemeProvider initialAccent={accentColor}>
-      <div className="min-h-screen" style={{ '--accent-color': accentColor, '--accent-bg': `${accentColor}12`, '--accent-border': `${accentColor}30` } as React.CSSProperties}>
+    <ThemeProvider initialAccent={accentColor} initialPaletteId={paletteId}>
+      <div style={cssVars as React.CSSProperties}>
         <OfflineIndicator />
         <main className="flex-1 pb-24 overflow-y-auto">{children}</main>
         <BottomNav locale={locale} />

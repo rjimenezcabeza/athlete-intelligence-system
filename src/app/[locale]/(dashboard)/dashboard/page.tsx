@@ -2,12 +2,45 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+
+function DailyQuote() {
+  const [quote, setQuote] = useState<{ q: string; a: string } | null>(null)
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const cached = localStorage.getItem('daily_quote')
+    if (cached) {
+      try {
+        const p = JSON.parse(cached)
+        if (p.date === today) { setQuote(p); return }
+      } catch {}
+    }
+    fetch('/api/quotes/daily')
+      .then(r => r.json())
+      .then(d => {
+        const entry = { q: d.quote, a: d.author, date: today }
+        localStorage.setItem('daily_quote', JSON.stringify(entry))
+        setQuote(entry)
+      })
+      .catch(() => {})
+  }, [])
+  if (!quote) return null
+  return (
+    <div style={{ padding: '14px 18px', background: 'var(--card-bg)', border: '1px solid var(--accent-color,#C8FF00)18', borderRadius: 16, borderLeft: '3px solid var(--accent-color,#C8FF00)' }}>
+      <p style={{ fontSize: 13, color: 'var(--text-primary)', fontStyle: 'italic', lineHeight: 1.6, marginBottom: 6 }}>
+        &ldquo;{quote.q}&rdquo;
+      </p>
+      <p style={{ fontSize: 11, color: 'var(--accent-color,#C8FF00)', fontWeight: 700, fontFamily: 'Syne, sans-serif', letterSpacing: '0.06em' }}>
+        — {quote.a}
+      </p>
+    </div>
+  )
+}
 import { MuscleVolumeChart } from '@/components/dashboard/MuscleVolumeChart'
 import { MesocycleWidget } from '@/components/dashboard/MesocycleWidget'
 import { MesocycleCreateModal } from '@/components/dashboard/MesocycleCreateModal'
 import { DeloadAlert } from '@/components/dashboard/DeloadAlert'
 
-const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
+const BG = 'var(--bg-primary)', CARD = 'var(--card-bg)', ACC = 'var(--accent-color)', T1 = 'var(--text-primary)', T2 = 'var(--text-secondary)', T3 = 'var(--text-tertiary)', BORDER = 'var(--card-border)'
 
 function Skel({ w = '100%', h = 32 }: { w?: string | number; h?: number }) {
   return <div className="skeleton" style={{ width: w, height: h, borderRadius: 10, flexShrink: 0 }} />
@@ -150,6 +183,9 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+        {/* Daily motivational quote */}
+        <DailyQuote />
 
         {/* Banner importacion — solo para usuarios sin import_onboarded_at */}
         {!loading && !data?.profile?.import_onboarded_at && (

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 
-const BG = '#0A0A0F', CARD = '#111118', ACC = '#C8FF00', T1 = '#F0F0F5', T2 = '#8888AA', T3 = '#44445a', BORDER = 'rgba(255,255,255,0.06)'
+const BG = 'var(--bg-primary)', CARD = 'var(--card-bg)', ACC = 'var(--accent-color)', T1 = 'var(--text-primary)', T2 = 'var(--text-secondary)', T3 = 'var(--text-tertiary)', BORDER = 'var(--card-border)'
 
 const MC: Record<string, string> = {
   chest: '#FF6B6B', back: '#4ECDC4', shoulders: '#A78BFA', arms: '#FBBF24',

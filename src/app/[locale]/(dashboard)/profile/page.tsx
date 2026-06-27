@@ -6,12 +6,12 @@ import { WearablesPanel } from '@/components/settings/WearablesPanel'
 import { useTheme, PALETTES } from '@/components/providers/ThemeProvider'
 import { MacroPieChart } from '@/components/profile/MacroPieChart'
 
-const BG = '#0A0A0F'
-const CARD = 'rgba(255,255,255,0.03)'
-const BORDER = 'rgba(255,255,255,0.07)'
-const T1 = '#ddd'
-const T2 = '#888'
-const T3 = '#444'
+const BG = 'var(--bg-primary)'
+const CARD = 'var(--card-bg)'
+const BORDER = 'var(--card-border)'
+const T1 = 'var(--text-primary)'
+const T2 = 'var(--text-secondary)'
+const T3 = 'var(--text-tertiary)'
 
 type View = 'main' | 'settings' | 'account'
 
@@ -68,7 +68,7 @@ function BackHeader({ title, onBack }: { title: string; onBack: () => void }) {
 }
 
 function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
-  const acc = '#C8FF00'
+  const acc = 'var(--accent-color)'
   return (
     <button onClick={onToggle} style={{ width: 44, height: 24, borderRadius: 12, background: enabled ? acc : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
       <div style={{ position: 'absolute', top: 3, left: enabled ? 22 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
@@ -161,7 +161,7 @@ export default function ProfilePage() {
       await fetch('/api/profile/avatar', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar_url: publicUrl })
+        body: JSON.stringify({ avatarUrl: publicUrl })
       })
       setProfile((p: any) => ({ ...p, avatar_url: publicUrl }))
     } catch {}

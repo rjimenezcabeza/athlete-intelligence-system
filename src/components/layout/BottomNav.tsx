@@ -7,9 +7,9 @@ const HomeIcon = () => (
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
   </svg>
 )
-const UploadIcon = () => (
+const VideoIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+    <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
   </svg>
 )
 const PlusIcon = () => (
@@ -29,16 +29,15 @@ const UserIcon = () => (
 )
 
 const NAV = [
-  { href: 'dashboard', Icon: HomeIcon, es: 'Inicio', en: 'Home' },
-  { href: 'athlete', Icon: UserIcon, es: 'Atleta', en: 'Athlete' },
-  { href: 'session/new', Icon: PlusIcon, es: null, en: null, primary: true },
-  { href: 'history', Icon: ClockIcon, es: 'Historial', en: 'History' },
-  { href: 'profile', Icon: UserIcon, es: 'Perfil', en: 'Profile' },
+  { href: 'dashboard', Icon: HomeIcon, label: 'Inicio' },
+  { href: 'video',    Icon: VideoIcon, label: 'Técnica' },
+  { href: 'session/new', Icon: PlusIcon, label: null, primary: true },
+  { href: 'history',  Icon: ClockIcon, label: 'Historial' },
+  { href: 'profile',  Icon: UserIcon,  label: 'Perfil' },
 ]
 
 export default function BottomNav({ locale }: { locale: string }) {
   const pathname = usePathname()
-  const isEs = locale === 'es'
 
   return (
     <nav style={{
@@ -53,15 +52,16 @@ export default function BottomNav({ locale }: { locale: string }) {
       {NAV.map(item => {
         const href = '/' + locale + '/' + item.href
         const base = item.href.split('/')[0]
-        const isActive = pathname === href || (base !== 'session' && pathname.includes('/' + locale + '/' + base))
+        const isActive = pathname === href || (base !== 'session' && pathname.startsWith('/' + locale + '/' + base))
 
         if (item.primary) return (
           <Link key={item.href} href={href} className="pulse-acc" style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             width: 58, height: 58, borderRadius: 18,
-            background: 'linear-gradient(135deg,#C8FF00,#88DD00)',
+            background: 'linear-gradient(135deg, var(--accent-color,#C8FF00), color-mix(in srgb, var(--accent-color,#C8FF00) 60%, #000))',
             color: '#0A0A0F', marginTop: -18,
-            transition: 'transform 0.15s'
+            transition: 'transform 0.15s',
+            flexShrink: 0,
           }}>
             <item.Icon />
           </Link>
@@ -70,19 +70,20 @@ export default function BottomNav({ locale }: { locale: string }) {
         return (
           <Link key={item.href} href={href} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-            padding: '6px 12px',
-            color: isActive ? '#C8FF00' : '#44445a',
+            padding: '6px 10px',
+            color: isActive ? 'var(--accent-color,#C8FF00)' : 'var(--text-tertiary,#44445a)',
             transition: 'color 0.2s, transform 0.15s',
             transform: isActive ? 'scale(1.08)' : 'scale(1)',
           }}>
             <item.Icon />
-            <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif', letterSpacing: '0.04em' }}>
-              {isEs ? item.es : item.en}
-            </span>
+            {item.label && (
+              <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif', letterSpacing: '0.04em' }}>
+                {item.label}
+              </span>
+            )}
           </Link>
         )
       })}
-      <style dangerouslySetInnerHTML={{ __html: '@keyframes pulseAcc{0%,100%{box-shadow:0 0 0 0 rgba(200,255,0,0.4),0 0 24px rgba(200,255,0,0.2)}50%{box-shadow:0 0 0 8px rgba(200,255,0,0),0 0 32px rgba(200,255,0,0.35)}}.pulse-acc{animation:pulseAcc 2.5s ease-in-out infinite}' }} />
     </nav>
   )
 }
