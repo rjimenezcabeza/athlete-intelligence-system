@@ -1,8 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export const maxDuration = 30
+
+// Admin client for storage — bypasses RLS correctly with service role key
+function adminStorage() {
+  return createClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function POST(request: Request) {
   try {
@@ -88,40 +98,43 @@ export async function POST(request: Request) {
       }, { status: 413 })
     }
 
-    // Auto-create bucket if needed
-    const { data: buckets } = await (supabase as any).storage.listBuckets()
-    if (!buckets?.some((b: any) => b.name === 'imports')) {
-      await (supabase as any).storage.createBucket('imports', {
-        public: false,
-        fileSizeLimit: 10 * 1024 * 1024
-      })
-    }
-
-    // Detect file type from extension (more reliable than MIME in browser)
+    // Detect content type from extension (browser MIME type can be empty on mobile)
     const ext = filename.split('.').pop()?.toLowerCase() || ''
+    const mimeByExt: Record<string, string> = {
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      xls: 'application/vnd.ms-excel',
+      xlsm: 'application/vnd.ms-excel.sheet.macroEnabled.12',
+      csv: 'text/csv',
+      pdf: 'application/pdf',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', heic: 'image/heic', heif: 'image/heif',
+      png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      txt: 'text/plain',
+    }
+    const resolvedContentType = mimeByExt[ext] || contentType || 'application/octet-stream'
+
+    // fileType label for DB
     let fileType = 'other'
     if (['xlsx', 'xls', 'xlsm', 'xlsb', 'csv'].includes(ext)) fileType = 'excel'
-    else if (['jpg', 'jpeg', 'heic', 'heif'].includes(ext)) fileType = 'image/jpeg'
-    else if (ext === 'png') fileType = 'image/png'
-    else if (ext === 'webp') fileType = 'image/webp'
-    else if (ext === 'gif') fileType = 'image/gif'
-    else if (ext === 'pdf') fileType = 'application/pdf'
+    else if (['jpg', 'jpeg', 'heic', 'heif', 'png', 'webp', 'gif'].includes(ext)) fileType = 'image'
+    else if (ext === 'pdf') fileType = 'pdf'
     else if (['doc', 'docx'].includes(ext)) fileType = 'word'
     else if (ext === 'txt') fileType = 'text'
-    else if (contentType.startsWith('image/')) fileType = contentType
 
     const safeName = filename.replace(/[^a-zA-Z0-9._\-]/g, '_').slice(0, 100)
     const storagePath = `${profile.id}/${Date.now()}_${safeName}`
 
-    console.log('[upload] Uploading:', { path: storagePath, size: buffer.byteLength, type: contentType, ext })
+    console.log('[upload] Uploading via admin client:', { path: storagePath, size: buffer.byteLength, type: resolvedContentType })
 
-    const { error: uploadError } = await (supabase as any)
+    // Use admin storage client — SSR client doesn't send Authorization header for storage
+    const adminDb = adminStorage()
+    const { error: uploadError } = await (adminDb as any)
       .storage
       .from('imports')
       .upload(storagePath, buffer, {
-        contentType: contentType,
-        upsert: false,
-        duplex: 'half'
+        contentType: resolvedContentType,
+        upsert: false
       })
 
     if (uploadError) {
@@ -129,7 +142,6 @@ export async function POST(request: Request) {
       return NextResponse.json({
         error: 'Storage upload failed',
         details: uploadError.message,
-        hint: uploadError.statusCode === '413' ? 'File too large for storage' : undefined
       }, { status: 500 })
     }
 

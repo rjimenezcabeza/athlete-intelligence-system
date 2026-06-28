@@ -40,7 +40,7 @@ export async function PUT(req: Request) {
     const allowed = [
       'display_name', 'primary_goal', 'training_experience_years',
       'body_weight_kg', 'height_cm', 'weight_unit', 'language',
-      'accent_color', 'ui_theme',
+      'accent_color', 'ui_theme', 'color_palette', 'custom_bg_color',
       'notification_workout_reminders', 'notification_progression_alerts',
       'notification_coach_insights', 'notification_weekly_summary',
       'nutrition_calories_target', 'nutrition_protein_g', 'nutrition_carbs_g',

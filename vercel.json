@@ -15,4 +15,17 @@
     "src/app/api/admin/grant-pro/route.ts": {
       "maxDuration": 10
     },
-    
+    "src/app/api/video/analyze/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/ai/suggestions/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/ai/progression/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/memory/analyze/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}

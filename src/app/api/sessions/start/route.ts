@@ -30,14 +30,21 @@ export async function POST(request: Request) {
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     const body = await request.json().catch(() => ({}))
     const now = new Date().toISOString()
+    const insertData: Record<string, unknown> = {
+      athlete_id: profile.id,
+      session_date: body.session_date ?? now.split('T')[0],
+      status: 'active',
+      started_at: now,
+    }
+    if (body.readiness_score != null) insertData.readiness_score = Number(body.readiness_score)
+    if (body.sleep_quality != null) insertData.sleep_quality = Number(body.sleep_quality)
+    if (body.stress_level != null) insertData.stress_level = Number(body.stress_level)
+    if (body.notes) insertData.notes = String(body.notes)
+    if (body.body_weight_kg != null) insertData.body_weight_kg = Number(body.body_weight_kg)
+
     const { data: session, error } = await (admin as any)
       .from('training_sessions')
-      .insert({
-        athlete_id: profile.id,
-        session_date: body.session_date ?? now.split('T')[0],
-        status: 'active',
-        started_at: now  // CRÍTICO: guardar started_at desde el inicio
-      })
+      .insert(insertData)
       .select('id, session_date, status, started_at, athlete_id')
       .single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

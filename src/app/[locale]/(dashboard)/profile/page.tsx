@@ -81,7 +81,12 @@ export default function ProfilePage() {
   const router = useRouter()
   const locale = (params?.locale as string) ?? 'es'
   const isEs = locale === 'es'
-  const { accentColor, setAccentColor, uiTheme, setUiTheme, activePaletteId, setPalette, bgColor, setBgColor } = useTheme()
+  const {
+    accentColor, setAccentColor, uiTheme, setUiTheme, activePaletteId, setPalette,
+    bgColor, setBgColor,
+    pendingAccent, pendingBg, hasPendingChanges,
+    setPendingAccent, setPendingBg, saveTheme, discardPending,
+  } = useTheme()
 
   const [view, setView] = useState<View>('main')
   const [profile, setProfile] = useState<any>(null)
@@ -280,18 +285,18 @@ export default function ProfilePage() {
               <input
                 type="color"
                 value={accentColor}
-                onChange={e => setAccentColor(e.target.value)}
-                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer', padding: 2, background: 'none', appearance: 'none' }}
+                onChange={e => setPendingAccent(e.target.value)}
+                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer', padding: 2, background: 'none', appearance: 'none' as const }}
               />
             </div>
             <div>
-              <p style={{ fontSize: 13, color: T1, fontFamily: 'DM Mono, monospace', marginBottom: 2 }}>{accentColor.toUpperCase()}</p>
-              <p style={{ fontSize: 11, color: T3 }}>{isEs ? 'Solo cambia el color de acento' : 'Changes accent color only'}</p>
+              <p style={{ fontSize: 13, color: T1, fontFamily: 'DM Mono, monospace', marginBottom: 2 }}>{(pendingAccent ?? accentColor).toUpperCase()}</p>
+              <p style={{ fontSize: 11, color: T3 }}>{isEs ? 'Vista previa en tiempo real' : 'Live preview'}</p>
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 4 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, marginLeft: 4 }}>
               {ACCENT_COLORS.map(({ color, name }) => (
-                <button key={color} onClick={() => setAccentColor(color)} title={name}
-                  style={{ width: 28, height: 28, borderRadius: '50%', background: color, border: accentColor === color ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer', outline: 'none', boxShadow: accentColor === color ? `0 0 0 2px ${color}50` : 'none', transition: 'all 0.2s' }} />
+                <button key={color} onClick={() => setPendingAccent(color)} title={name}
+                  style={{ width: 28, height: 28, borderRadius: '50%', background: color, border: (pendingAccent ?? accentColor) === color ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer', outline: 'none', boxShadow: (pendingAccent ?? accentColor) === color ? `0 0 0 2px ${color}50` : 'none', transition: 'all 0.2s' }} />
               ))}
             </div>
           </div>
@@ -300,39 +305,76 @@ export default function ProfilePage() {
         {/* Color de fondo personalizado */}
         <div>
           <SectionLabel>{isEs ? 'Color de fondo' : 'Background color'}</SectionLabel>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const }}>
+            <div style={{ position: 'relative' as const }}>
               <input
                 type="color"
-                value={bgColor || getPaletteById(activePaletteId).bg}
-                onChange={e => setBgColor(e.target.value)}
-                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer', padding: 2, background: 'none', appearance: 'none' }}
+                value={pendingBg ?? bgColor ?? getPaletteById(activePaletteId).bg}
+                onChange={e => setPendingBg(e.target.value)}
+                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer', padding: 2, background: 'none', appearance: 'none' as const }}
               />
             </div>
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: 13, color: T1, fontFamily: 'DM Mono, monospace', marginBottom: 2 }}>
-                {(bgColor || getPaletteById(activePaletteId).bg).toUpperCase()}
+                {(pendingBg ?? bgColor ?? getPaletteById(activePaletteId).bg).toUpperCase()}
               </p>
               <p style={{ fontSize: 11, color: T3 }}>
                 {isEs ? 'Fondo de pantalla de la app' : 'App screen background'}
               </p>
             </div>
-            {bgColor && (
+            {(pendingBg ?? bgColor) && (
               <button
-                onClick={() => setBgColor(null)}
-                style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.06)', color: T2, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>
+                onClick={() => setPendingBg(null)}
+                style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.06)', color: T2, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' as const }}>
                 {isEs ? 'Restaurar' : 'Reset'}
               </button>
             )}
           </div>
           {/* Quick dark presets */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' as const }}>
             {['#0A0A0F', '#060D14', '#0F0804', '#060F08', '#080613', '#111111', '#1a1a1a', '#0d0d0d'].map(c => (
-              <button key={c} onClick={() => setBgColor(c)} title={c}
-                style={{ width: 28, height: 28, borderRadius: 6, background: c, border: bgColor === c ? `2px solid ${accentColor}` : '2px solid rgba(255,255,255,0.12)', cursor: 'pointer', outline: 'none', transition: 'all 0.15s' }} />
+              <button key={c} onClick={() => setPendingBg(c)} title={c}
+                style={{ width: 28, height: 28, borderRadius: 6, background: c, border: (pendingBg ?? bgColor) === c ? `2px solid ${accentColor}` : '2px solid rgba(255,255,255,0.12)', cursor: 'pointer', outline: 'none', transition: 'all 0.15s' }} />
             ))}
           </div>
         </div>
+
+        {/* ── Pending changes save bar ── */}
+        {hasPendingChanges && (
+          <div style={{
+            position: 'sticky' as const, bottom: 80, zIndex: 20,
+            background: `linear-gradient(135deg, ${accentColor}18, ${accentColor}0a)`,
+            border: `1.5px solid ${accentColor}40`,
+            borderRadius: 16, padding: '14px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          }}>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: accentColor, fontFamily: 'Syne, sans-serif', marginBottom: 2 }}>
+                {isEs ? 'Cambios sin guardar' : 'Unsaved changes'}
+              </p>
+              <p style={{ fontSize: 11, color: T3, fontFamily: 'Inter, sans-serif' }}>
+                {isEs ? 'La vista previa está activa' : 'Preview is active'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={discardPending} style={{
+                padding: '9px 14px', background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${BORDER}`, borderRadius: 10,
+                color: T2, fontSize: 12, fontWeight: 700,
+                fontFamily: 'Syne, sans-serif', cursor: 'pointer',
+              }}>{isEs ? 'Descartar' : 'Discard'}</button>
+              <button onClick={saveTheme} style={{
+                padding: '9px 18px',
+                background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+                border: 'none', borderRadius: 10,
+                color: '#0A0A0F', fontSize: 12, fontWeight: 800,
+                fontFamily: 'Syne, sans-serif', cursor: 'pointer',
+                boxShadow: `0 2px 12px ${accentColor}40`,
+              }}>{isEs ? '💾 Guardar' : '💾 Save'}</button>
+            </div>
+          </div>
+        )}
 
         {/* Notificaciones */}
         <div>
@@ -646,4 +688,38 @@ export default function ProfilePage() {
                   <tbody>
                     {dailyLogs.map((log: any) => (
                       <tr key={log.id} style={{ borderTop: `1px solid ${BORDER}` }}>
-                        <td style={{ padding: '5px 6px', color: T2 }}>{new Date(log.date).toLocaleDateString(isEs ? 'es-E
+                        <td style={{ padding: '5px 6px', color: T2 }}>{new Date(log.date).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' })}</td>
+                        <td style={{ padding: '5px 6px', color: T1, fontFamily: 'DM Mono, monospace' }}>{log.weight ? `${log.weight}` : '—'}</td>
+                        <td style={{ padding: '5px 6px', color: accentColor, fontFamily: 'DM Mono, monospace' }}>{log.energy ?? '—'}</td>
+                        <td style={{ padding: '5px 6px', color: T2, fontFamily: 'DM Mono, monospace' }}>{log.sleep ?? '—'}</td>
+                        <td style={{ padding: '5px 6px', color: '#FF6B6B', fontFamily: 'DM Mono, monospace' }}>{log.stress ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Acceso a submenús ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[
+            { key: 'settings', icon: '⚙️', title: isEs ? 'Ajustes y personalización' : 'Settings & customization', desc: isEs ? 'Idioma, colores, tema, notificaciones' : 'Language, colors, theme, notifications' },
+            { key: 'account', icon: '👤', title: isEs ? 'Cuenta y plan' : 'Account & plan', desc: isEs ? 'Sesión, plan actual, zona de peligro' : 'Session, current plan, danger zone' },
+          ].map(item => (
+            <button key={item.key} onClick={() => setView(item.key as View)}
+              style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 14, padding: '15px 16px', background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}>
+              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, color: T1, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>{item.title}</div>
+                <div style={{ fontSize: 11, color: T3, fontFamily: 'DM Mono, monospace', marginTop: 2 }}>{item.desc}</div>
+              </div>
+              <span style={{ color: T3, fontSize: 20 }}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

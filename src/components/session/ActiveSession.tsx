@@ -1,9 +1,10 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSessionStore } from '@/stores/session.store'
 import { SetLogger, CompletedSet } from './SetLogger'
 import { LastPerformanceBadge } from '@/components/workout/LastPerformanceBadge'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 interface ActiveSessionProps { sessionId: string; locale: string }
 interface ExResult { id: string; name: string; muscle_group_primary: string; slug: string }
@@ -12,13 +13,26 @@ const MC: Record<string, string> = {
   chest: '#FF6B6B', back: '#4ECDC4', shoulders: '#A78BFA', arms: '#FBBF24',
   legs: '#60A5FA', core: '#F97316', glutes: '#EC4899', calves: '#10B981',
   'deltoides lateral': '#A78BFA', 'pecho': '#FF6B6B',
+  'espalda': '#4ECDC4', 'hombros': '#A78BFA', 'bíceps': '#FBBF24',
+  'tríceps': '#FBBF24', 'piernas': '#60A5FA', 'glúteos': '#EC4899',
+  'abdominales': '#F97316', 'pantorrillas': '#10B981',
 }
-const mc = (m: string) => MC[m?.toLowerCase()] ?? '#C8FF00'
+const mc = (m: string) => MC[m?.toLowerCase()] ?? '#8888AA'
+
+const T1 = 'var(--text-primary)'
+const T2 = 'var(--text-secondary)'
+const T3 = 'var(--text-tertiary)'
+const CARD = 'var(--card-bg)'
+const BORDER = 'var(--card-border)'
+
+const REST_PRESETS = [60, 90, 120, 180]
 
 export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   const router = useRouter()
+  const { accentColor } = useTheme()
   const { activeSession, exercises, currentExerciseIndex, setCurrentExerciseIndex,
     setActiveSession, addExercise, clearSession } = useSessionStore()
+
   const [ending, setEnding] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [showSearch, setShowSearch] = useState(false)
@@ -29,6 +43,12 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   const [inputFocus, setInputFocus] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const isEs = locale === 'es'
+
+  // Rest timer
+  const [restActive, setRestActive] = useState(false)
+  const [restRemaining, setRestRemaining] = useState(0)
+  const [restTotal, setRestTotal] = useState(120)
+  const restRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     fetch('/api/sessions/active').then(r => r.json()).then(d => {
@@ -64,6 +84,42 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
     }
   }, [showSearch])
 
+  // Rest timer logic
+  const startRest = useCallback((seconds: number) => {
+    setRestTotal(seconds)
+    setRestRemaining(seconds)
+    setRestActive(true)
+    if (restRef.current) clearInterval(restRef.current)
+    restRef.current = setInterval(() => {
+      setRestRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(restRef.current!)
+          setRestActive(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
+
+  const skipRest = useCallback(() => {
+    if (restRef.current) clearInterval(restRef.current)
+    setRestActive(false)
+    setRestRemaining(0)
+  }, [])
+
+  useEffect(() => { return () => { if (restRef.current) clearInterval(restRef.current) } }, [])
+
+  // Auto-trigger rest when a new set is logged
+  const prevSetsCount = useRef(0)
+  const totalSets = exercises.reduce((a, e) => a + e.sets.length, 0)
+  useEffect(() => {
+    if (totalSets > prevSetsCount.current && prevSetsCount.current > 0) {
+      startRest(restTotal)
+    }
+    prevSetsCount.current = totalSets
+  }, [totalSets, startRest, restTotal])
+
   const fmt = (s: number) => {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = s % 60
     if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(sc).padStart(2, '00')
@@ -94,16 +150,13 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
     if (!activeSession?.id || ending) return
     setEnding(true)
     try {
-      const res = await fetch('/api/sessions/' + (activeSession.id ?? sessionId) + '/end', {
+      const sid = activeSession.id ?? sessionId
+      const res = await fetch('/api/sessions/' + sid + '/end', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }
       })
-      if (!res.ok) {
-        await fetch('/api/sessions/' + sessionId + '/end', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }
-        })
-      }
+      if (!res.ok) throw new Error('end failed')
       clearSession()
-      router.push('/' + locale + '/session/' + (activeSession.id ?? sessionId) + '/feedback')
+      router.push('/' + locale + '/session/' + sid + '/feedback')
     } catch (e) {
       console.error(e)
       setEnding(false)
@@ -111,117 +164,174 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   }
 
   const cur = exercises[currentExerciseIndex]
-  const totalSets = exercises.reduce((a, e) => a + e.sets.length, 0)
+  const totalVolume = exercises.reduce((a, e) => a + e.sets.reduce((b: number, s: any) => b + ((s.weight_kg || 0) * (s.reps_completed || 0)), 0), 0)
+  const restPct = restActive ? ((restTotal - restRemaining) / restTotal) * 100 : 0
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A0A0F', color: '#F0F0F5', maxWidth: 480, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: T1, maxWidth: 480, margin: '0 auto' }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 20px 16px' }}>
-        <div>
-          <div style={{ color: '#C8FF00', fontSize: 36, fontWeight: 700, fontFamily: 'DM Mono, monospace', letterSpacing: '0.04em', lineHeight: 1 }}>
-            {fmt(elapsed)}
+      {/* ── Header: timer + finish ── */}
+      <div style={{ padding: '16px 20px 12px', borderBottom: `1px solid ${BORDER}`, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(8px)', position: 'sticky' as const, top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ color: accentColor, fontSize: 34, fontWeight: 700, fontFamily: 'DM Mono, monospace', letterSpacing: '0.04em', lineHeight: 1 }}>
+              {fmt(elapsed)}
+            </div>
+            <div style={{ color: T3, fontSize: 11, fontFamily: 'Syne, sans-serif', marginTop: 3, letterSpacing: '0.06em', display: 'flex', gap: 8 }}>
+              <span>{exercises.length} {isEs ? 'ejercicios' : 'exercises'}</span>
+              <span>·</span>
+              <span>{totalSets} {isEs ? 'series' : 'sets'}</span>
+              {totalVolume > 0 && <>
+                <span>·</span>
+                <span>{Math.round(totalVolume)}kg {isEs ? 'vol.' : 'vol.'}</span>
+              </>}
+            </div>
           </div>
-          <div style={{ color: '#44445a', fontSize: 11, fontFamily: 'Syne, sans-serif', marginTop: 3, letterSpacing: '0.06em' }}>
-            {exercises.length} {isEs ? 'ej' : 'ex'} · {totalSets} {isEs ? 'series' : 'sets'}
-          </div>
+          <button onClick={endSession} disabled={ending} style={{
+            background: 'transparent', border: '1.5px solid rgba(255,107,107,0.45)',
+            borderRadius: 12, color: '#FF6B6B', padding: '10px 18px',
+            fontSize: 11, fontWeight: 800, fontFamily: 'Syne, sans-serif',
+            cursor: 'pointer', letterSpacing: '0.1em', textTransform: 'uppercase' as const,
+            opacity: ending ? 0.6 : 1, transition: 'all 0.2s',
+          }}>
+            {ending ? '...' : (isEs ? 'Finalizar' : 'Finish')}
+          </button>
         </div>
-        <button onClick={endSession} disabled={ending} style={{
-          background: 'transparent',
-          border: '1.5px solid rgba(255,107,107,0.4)',
-          borderRadius: 12,
-          color: '#FF6B6B', padding: '10px 20px',
-          fontSize: 11, fontWeight: 800,
-          fontFamily: 'Syne, sans-serif', cursor: 'pointer',
-          letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-          opacity: ending ? 0.6 : 1, transition: 'all 0.2s'
-        }}>
-          {ending ? '...' : (isEs ? 'Finalizar' : 'Finish')}
-        </button>
       </div>
 
-      {/* ── Tabs ejercicios ── */}
+      {/* ── Rest timer banner ── */}
+      {restActive && (
+        <div style={{
+          background: `linear-gradient(135deg, ${accentColor}18, ${accentColor}08)`,
+          borderBottom: `2px solid ${accentColor}40`,
+          padding: '12px 20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <div style={{ fontSize: 10, color: T3, fontFamily: 'Syne, sans-serif', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' as const, marginBottom: 2 }}>
+              {isEs ? '⏱ DESCANSO' : '⏱ REST'}
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: accentColor, fontFamily: 'DM Mono, monospace', lineHeight: 1 }}>
+              {fmt(restRemaining)}
+            </div>
+          </div>
+          <svg width={44} height={44} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+            <circle cx={22} cy={22} r={18} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={4} />
+            <circle cx={22} cy={22} r={18} fill="none" stroke={accentColor} strokeWidth={4}
+              strokeDasharray={`${2 * Math.PI * 18}`}
+              strokeDashoffset={`${2 * Math.PI * 18 * (1 - restPct / 100)}`}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dashoffset 1s linear' }} />
+          </svg>
+          <button onClick={skipRest} style={{
+            padding: '9px 16px', background: 'rgba(255,255,255,0.05)',
+            border: `1px solid ${BORDER}`, borderRadius: 10,
+            color: T2, fontSize: 11, fontWeight: 700,
+            fontFamily: 'Syne, sans-serif', cursor: 'pointer',
+          }}>{isEs ? 'Saltar' : 'Skip'}</button>
+        </div>
+      )}
+
+      {/* ── Rest presets (idle) ── */}
+      {!restActive && totalSets > 0 && (
+        <div style={{ display: 'flex', gap: 6, padding: '8px 20px', borderBottom: `1px solid ${BORDER}`, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, color: T3, fontFamily: 'DM Mono, monospace', marginRight: 4, whiteSpace: 'nowrap' as const }}>
+            {isEs ? 'Descanso:' : 'Rest:'}
+          </span>
+          {REST_PRESETS.map(s => (
+            <button key={s} onClick={() => { setRestTotal(s); startRest(s) }} style={{
+              padding: '5px 10px',
+              background: restTotal === s ? accentColor + '20' : 'transparent',
+              border: `1px solid ${restTotal === s ? accentColor + '60' : BORDER}`,
+              borderRadius: 8, color: restTotal === s ? accentColor : T3,
+              fontSize: 11, fontWeight: 700, fontFamily: 'DM Mono, monospace',
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}>{s < 60 ? `${s}s` : `${s / 60}m`}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Exercise tabs ── */}
       {exercises.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto' as const, padding: '0 20px 16px', scrollbarWidth: 'none' as const }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto' as const, padding: '12px 20px 0', scrollbarWidth: 'none' as const }}>
           {exercises.map((ex, i) => (
-            <button key={ex.id} onClick={() => setCurrentExerciseIndex(i)} style={{
-              background: i === currentExerciseIndex ? '#C8FF00' : 'rgba(255,255,255,0.04)',
-              color: i === currentExerciseIndex ? '#0A0A0F' : '#8888AA',
-              border: i === currentExerciseIndex ? 'none' : '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10, padding: '8px 16px',
-              fontSize: 12, fontWeight: 700,
-              fontFamily: 'Syne, sans-serif', cursor: 'pointer',
-              whiteSpace: 'nowrap' as const, flexShrink: 0,
-              transition: 'all 0.15s',
+            <button key={ex.id + i} onClick={() => setCurrentExerciseIndex(i)} style={{
+              background: i === currentExerciseIndex ? accentColor : 'rgba(255,255,255,0.04)',
+              color: i === currentExerciseIndex ? '#0A0A0F' : T3,
+              border: i === currentExerciseIndex ? 'none' : `1px solid ${BORDER}`,
+              borderRadius: 10, padding: '7px 14px',
+              fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif',
+              cursor: 'pointer', whiteSpace: 'nowrap' as const, flexShrink: 0,
+              transition: 'all 0.15s', position: 'relative' as const,
             }}>
               {ex.name.split(' ').slice(0, 2).join(' ')}
+              {ex.sets.length > 0 && (
+                <span style={{
+                  position: 'absolute' as const, top: -5, right: -5,
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: i === currentExerciseIndex ? 'rgba(0,0,0,0.5)' : accentColor,
+                  color: '#0A0A0F', fontSize: 8, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'DM Mono, monospace',
+                }}>{ex.sets.length}</span>
+              )}
             </button>
           ))}
           <button onClick={() => setShowSearch(true)} style={{
-            background: 'rgba(200,255,0,0.06)', color: '#C8FF00',
-            border: '1px dashed rgba(200,255,0,0.35)',
-            borderRadius: 10, padding: '8px 18px',
-            fontSize: 18, fontWeight: 700,
-            fontFamily: 'Syne, sans-serif', cursor: 'pointer', flexShrink: 0,
-            lineHeight: 1,
+            background: `${accentColor}10`, color: accentColor,
+            border: `1px dashed ${accentColor}40`,
+            borderRadius: 10, padding: '7px 16px',
+            fontSize: 18, fontWeight: 700, cursor: 'pointer', flexShrink: 0, lineHeight: 1,
           }}>+</button>
         </div>
       )}
 
-      {/* ── Contenido ── */}
-      <div style={{ padding: '0 20px 120px' }}>
+      {/* ── Main content ── */}
+      <div style={{ padding: '16px 20px 140px' }}>
         {exercises.length === 0 ? (
           <div style={{ textAlign: 'center' as const, paddingTop: 80 }}>
-            <div style={{ fontSize: 80, marginBottom: 20, opacity: 0.08, lineHeight: 1, fontWeight: 700, color: '#C8FF00' }}>+</div>
-            <p style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: '#F0F0F5', marginBottom: 8 }}>
+            <div style={{ fontSize: 80, lineHeight: 1, color: accentColor, opacity: 0.07, fontWeight: 800, marginBottom: 20 }}>+</div>
+            <p style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: T1, marginBottom: 8 }}>
               {isEs ? 'Sin ejercicios' : 'No exercises yet'}
             </p>
-            <p style={{ fontSize: 14, color: '#44445a', marginBottom: 32, fontFamily: 'Inter, sans-serif' }}>
-              {isEs ? 'Añade tu primer ejercicio' : 'Add your first exercise'}
+            <p style={{ fontSize: 14, color: T3, marginBottom: 36, fontFamily: 'Inter, sans-serif' }}>
+              {isEs ? 'Añade tu primer ejercicio para comenzar' : 'Add your first exercise to begin'}
             </p>
             <button onClick={() => setShowSearch(true)} style={{
-              background: 'linear-gradient(135deg,#C8FF00,#88DD00)', color: '#0A0A0F',
-              border: 'none', borderRadius: 16,
-              padding: '18px 48px', fontSize: 16, fontWeight: 700,
-              fontFamily: 'Syne, sans-serif', cursor: 'pointer',
-              letterSpacing: '0.04em',
-              boxShadow: '0 4px 20px rgba(200,255,0,0.3)',
+              background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+              color: '#0A0A0F', border: 'none', borderRadius: 16,
+              padding: '16px 40px', fontSize: 16, fontWeight: 700,
+              fontFamily: 'Syne, sans-serif', cursor: 'pointer', letterSpacing: '0.04em',
+              boxShadow: `0 4px 20px ${accentColor}30`,
             }}>+ {isEs ? 'Agregar ejercicio' : 'Add exercise'}</button>
           </div>
         ) : cur ? (
           <div>
-            {/* Nombre y badge músculo */}
-            <div style={{ marginBottom: 20, paddingTop: 4 }}>
-              <p style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Syne, sans-serif', marginBottom: 10, color: '#F0F0F5', letterSpacing: '-0.01em' }}>
-                {cur.name}
-              </p>
-              <span style={{
-                fontSize: 10, fontWeight: 800, letterSpacing: '0.1em',
-                textTransform: 'uppercase' as const, fontFamily: 'Syne, sans-serif',
-                padding: '5px 12px', borderRadius: 8, display: 'inline-block',
-                color: mc(cur.muscle_group_primary),
-                background: mc(cur.muscle_group_primary) + '22',
-                border: '1px solid ' + mc(cur.muscle_group_primary) + '44',
-              }}>
-                {cur.muscle_group_primary}
-              </span>
+            {/* Exercise header */}
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 22, fontWeight: 700, fontFamily: 'Syne, sans-serif', marginBottom: 8, color: T1 }}>{cur.name}</p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' as const }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
+                  fontFamily: 'Syne, sans-serif', padding: '4px 10px', borderRadius: 7,
+                  color: mc(cur.muscle_group_primary), background: mc(cur.muscle_group_primary) + '22',
+                  border: `1px solid ${mc(cur.muscle_group_primary)}44`,
+                }}>{cur.muscle_group_primary}</span>
+                {cur.sets.length > 0 && (
+                  <span style={{ fontSize: 12, color: T3, fontFamily: 'DM Mono, monospace' }}>
+                    {cur.sets.length} {isEs ? 'series' : 'sets'} · {Math.round(cur.sets.reduce((a: number, s: any) => a + ((s.weight_kg || 0) * (s.reps_completed || 0)), 0))}kg
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Rendimiento anterior */}
             <LastPerformanceBadge exerciseId={cur.id} locale={locale} />
 
-            {/* Series completadas */}
-            {cur.sets.map((set, i) => (
-              <CompletedSet
-                key={set.id ?? i}
-                set={set}
-                exerciseIndex={currentExerciseIndex}
-                setIndex={i}
-                sessionId={activeSession?.id ?? sessionId}
-              />
+            {cur.sets.map((set: any, i: number) => (
+              <CompletedSet key={set.id ?? i} set={set} exerciseIndex={currentExerciseIndex}
+                setIndex={i} sessionId={activeSession?.id ?? sessionId} />
             ))}
 
-            {/* Logger nueva serie */}
             {cur.session_exercise_id && (
               <SetLogger
                 sessionId={activeSession?.id ?? sessionId}
@@ -235,114 +345,76 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
         ) : null}
       </div>
 
-      {/* ── Modal buscador ── */}
+      {/* ── Exercise search modal ── */}
       {showSearch && (
-        <div
-          onClick={() => setShowSearch(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 200,
-            background: 'rgba(0,0,0,0.7)',
-            backdropFilter: 'blur(6px)',
-            WebkitBackdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'flex-end',
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: 480, margin: '0 auto',
-              background: '#111118',
-              borderRadius: '24px 24px 0 0',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderBottom: 'none',
-              maxHeight: '80vh',
-              display: 'flex', flexDirection: 'column',
-              animation: 'slideUp 0.35s cubic-bezier(0.32,0.72,0,1) both',
-            }}
-          >
-            <style dangerouslySetInnerHTML={{ __html: '@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}' }} />
-            {/* Handle */}
-            <div style={{
-              width: 40, height: 4, borderRadius: 2,
-              background: 'rgba(255,255,255,0.12)',
-              margin: '12px auto 0',
-              flexShrink: 0,
-            }} />
-            <div style={{ padding: '12px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <p style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: '#F0F0F5' }}>
+        <div onClick={() => setShowSearch(false)} style={{
+          position: 'fixed' as const, inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '100%', maxWidth: 480, margin: '0 auto',
+            background: '#111118', borderRadius: '24px 24px 0 0',
+            border: `1px solid ${BORDER}`, borderBottom: 'none',
+            maxHeight: '82vh', display: 'flex', flexDirection: 'column' as const,
+          }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', margin: '10px auto 0', flexShrink: 0 }} />
+            <div style={{ padding: '12px 20px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <p style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Syne, sans-serif', color: T1 }}>
                 {isEs ? 'Añadir ejercicio' : 'Add exercise'}
               </p>
               <button onClick={() => setShowSearch(false)} style={{
-                background: '#1a1a2e', border: 'none', color: '#8888AA',
-                borderRadius: 8, padding: '7px 14px', cursor: 'pointer',
+                background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}`,
+                color: T2, borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
                 fontSize: 13, fontFamily: 'Syne, sans-serif'
               }}>✕</button>
             </div>
             <div style={{ padding: '0 20px 12px', flexShrink: 0 }}>
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder={isEs ? 'Buscar: press banca, sentadilla...' : 'Search: bench press, squat...'}
+              <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)}
+                placeholder={isEs ? 'press banca, sentadilla...' : 'bench press, squat...'}
                 style={{
-                  width: '100%',
-                  background: '#0d0d14',
-                  border: '1.5px solid ' + (inputFocus ? 'rgba(200,255,0,0.5)' : 'rgba(255,255,255,0.08)'),
-                  borderRadius: 14,
-                  color: '#F0F0F5',
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: 15,
-                  padding: '13px 16px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                  boxSizing: 'border-box',
+                  width: '100%', background: '#0d0d14',
+                  border: `1.5px solid ${inputFocus ? accentColor + '60' : BORDER}`,
+                  borderRadius: 14, color: T1, fontFamily: 'Inter, sans-serif',
+                  fontSize: 15, padding: '13px 16px', outline: 'none',
+                  transition: 'border-color 0.2s', boxSizing: 'border-box' as const,
                 }}
-                onFocus={() => setInputFocus(true)}
-                onBlur={() => setInputFocus(false)}
-              />
+                onFocus={() => setInputFocus(true)} onBlur={() => setInputFocus(false)} />
             </div>
             <div style={{ flex: 1, overflowY: 'auto' as const, padding: '0 20px 48px' }}>
               {searching ? (
                 <div style={{ textAlign: 'center' as const, padding: 40 }}>
-                  <div style={{ width: 28, height: 28, border: '2px solid #C8FF00', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
+                  <div style={{ width: 28, height: 28, border: `2px solid ${accentColor}`, borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
                   <style dangerouslySetInnerHTML={{ __html: '@keyframes spin{to{transform:rotate(360deg)}}' }} />
                 </div>
               ) : results.length === 0 ? (
-                <p style={{ textAlign: 'center' as const, color: '#44445a', padding: 40, fontFamily: 'Inter, sans-serif' }}>
+                <p style={{ textAlign: 'center' as const, color: T3, padding: 40, fontFamily: 'Inter, sans-serif' }}>
                   {isEs ? 'Sin resultados' : 'No results'}
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
                   {results.map(ex => (
                     <button key={ex.id} onClick={() => addEx(ex)} disabled={adding} style={{
-                      background: '#16161f',
-                      border: '1px solid rgba(255,255,255,0.06)',
+                      background: '#16161f', border: `1px solid ${BORDER}`,
                       borderRadius: 14, padding: '14px 16px',
-                      display: 'flex', justifyContent: 'space-between',
-                      alignItems: 'center', cursor: 'pointer',
-                      opacity: adding ? 0.5 : 1,
-                      textAlign: 'left' as const,
-                      transition: 'border-color 0.15s, background 0.15s',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      cursor: 'pointer', opacity: adding ? 0.5 : 1, textAlign: 'left' as const,
                       width: '100%',
                     }}>
                       <div>
-                        <p style={{ color: '#F0F0F5', fontSize: 15, fontWeight: 600, fontFamily: 'Syne, sans-serif', marginBottom: 3 }}>{ex.name}</p>
+                        <p style={{ color: T1, fontSize: 15, fontWeight: 600, fontFamily: 'Syne, sans-serif', marginBottom: 4 }}>{ex.name}</p>
                         <span style={{
                           fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
                           textTransform: 'uppercase' as const, fontFamily: 'Syne, sans-serif',
-                          padding: '3px 8px', borderRadius: 5, display: 'inline-block',
-                          color: mc(ex.muscle_group_primary),
-                          background: mc(ex.muscle_group_primary) + '22',
-                        }}>
-                          {ex.muscle_group_primary}
-                        </span>
+                          padding: '3px 8px', borderRadius: 5,
+                          color: mc(ex.muscle_group_primary), background: mc(ex.muscle_group_primary) + '22',
+                        }}>{ex.muscle_group_primary}</span>
                       </div>
                       <div style={{
                         width: 34, height: 34, borderRadius: '50%',
-                        background: 'rgba(200,255,0,0.08)',
+                        background: `${accentColor}15`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#C8FF00', fontSize: 20, fontWeight: 700, flexShrink: 0
+                        color: accentColor, fontSize: 20, fontWeight: 700, flexShrink: 0
                       }}>+</div>
                     </button>
                   ))}

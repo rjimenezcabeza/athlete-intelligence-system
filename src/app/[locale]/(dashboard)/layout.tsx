@@ -40,12 +40,26 @@ export default async function DashboardLayout({
     if (prof?.color_palette) paletteId = prof.color_palette
   } catch {}
 
+  let customBgColor: string | null = null
+  try {
+    const { data: prof2 } = await (supabase as any)
+      .from('athlete_profiles')
+      .select('custom_bg_color')
+      .eq('user_id', user.id)
+      .single()
+    if (prof2?.custom_bg_color) customBgColor = prof2.custom_bg_color
+  } catch {}
+
   const palette = getPaletteById(paletteId)
   const cssVars = buildCssVars(palette, accentColor)
+  // --bg-primary applied via <style> tag so client ThemeProvider can override it without CSS specificity fights
+  const bgPrimary = customBgColor || palette.bg
+  const { '--bg-primary': _ignored, ...cssVarsWithoutBg } = cssVars as Record<string, string>
 
   return (
-    <ThemeProvider initialAccent={accentColor} initialPaletteId={paletteId}>
-      <div style={cssVars as React.CSSProperties}>
+    <ThemeProvider initialAccent={accentColor} initialPaletteId={paletteId} initialBg={bgPrimary}>
+      <style dangerouslySetInnerHTML={{ __html: `:root { --bg-primary: ${bgPrimary}; }` }} />
+      <div style={cssVarsWithoutBg as React.CSSProperties}>
         <OfflineIndicator />
         <main className="flex-1 pb-24 overflow-y-auto">{children}</main>
         <BottomNav locale={locale} />
