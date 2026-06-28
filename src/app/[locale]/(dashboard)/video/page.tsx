@@ -88,23 +88,13 @@ export default function VideoAnalysisPage() {
 
     const extracted: string[] = []
     for (const t of times) {
-      await new Promise<void>((resolve) => {
-        let done = false
-        const capture = () => {
-          if (done) return
-          done = true
+      await new Promise<void>((res) => {
+        video.currentTime = t
+        video.onseeked = () => {
           ctx.drawImage(video, 0, 0, 640, 360)
           extracted.push(canvas.toDataURL('image/jpeg', 0.75))
-          resolve()
+          res()
         }
-        video.onseeked = capture
-        video.currentTime = t
-        // If already at the right time, onseeked may not fire — capture immediately
-        if (Math.abs(video.currentTime - t) < 0.05) {
-          setTimeout(capture, 100)
-        }
-        // Safety timeout: never hang more than 3s per frame
-        setTimeout(() => { if (!done) { done = true; resolve() } }, 3000)
       })
     }
     setFrames(extracted)
@@ -129,17 +119,11 @@ export default function VideoAnalysisPage() {
         body: JSON.stringify({ frames: stripped, exercise, lang: 'es' }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        // Show actual error detail so we can debug production issues
-        const msg = data.details ? `${data.error}: ${data.details}` : (data.error || 'Error al analizar')
-        setError(msg)
-        setLoading(false)
-        return
-      }
+      if (!res.ok) { setError(data.error || 'Error al analizar'); setLoading(false); return }
       setAnalysis(data.analysis)
       setStep('result')
     } catch (e) {
-      setError(`Error de conexión: ${String(e)}`)
+      setError('Error de conexión')
     } finally {
       setLoading(false)
     }

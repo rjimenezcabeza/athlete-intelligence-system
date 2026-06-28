@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PushNotificationToggle } from '@/components/settings/PushNotificationToggle'
 import { WearablesPanel } from '@/components/settings/WearablesPanel'
-import { useTheme, PALETTES } from '@/components/providers/ThemeProvider'
+import { useTheme, PALETTES, getPaletteById } from '@/components/providers/ThemeProvider'
 import { MacroPieChart } from '@/components/profile/MacroPieChart'
 
 const BG = 'var(--bg-primary)'
@@ -81,7 +81,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const locale = (params?.locale as string) ?? 'es'
   const isEs = locale === 'es'
-  const { accentColor, setAccentColor, uiTheme, setUiTheme, activePaletteId, setPalette } = useTheme()
+  const { accentColor, setAccentColor, uiTheme, setUiTheme, activePaletteId, setPalette, bgColor, setBgColor } = useTheme()
 
   const [view, setView] = useState<View>('main')
   const [profile, setProfile] = useState<any>(null)
@@ -294,6 +294,43 @@ export default function ProfilePage() {
                   style={{ width: 28, height: 28, borderRadius: '50%', background: color, border: accentColor === color ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer', outline: 'none', boxShadow: accentColor === color ? `0 0 0 2px ${color}50` : 'none', transition: 'all 0.2s' }} />
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Color de fondo personalizado */}
+        <div>
+          <SectionLabel>{isEs ? 'Color de fondo' : 'Background color'}</SectionLabel>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="color"
+                value={bgColor || getPaletteById(activePaletteId).bg}
+                onChange={e => setBgColor(e.target.value)}
+                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.15)', cursor: 'pointer', padding: 2, background: 'none', appearance: 'none' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 13, color: T1, fontFamily: 'DM Mono, monospace', marginBottom: 2 }}>
+                {(bgColor || getPaletteById(activePaletteId).bg).toUpperCase()}
+              </p>
+              <p style={{ fontSize: 11, color: T3 }}>
+                {isEs ? 'Fondo de pantalla de la app' : 'App screen background'}
+              </p>
+            </div>
+            {bgColor && (
+              <button
+                onClick={() => setBgColor(null)}
+                style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.06)', color: T2, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>
+                {isEs ? 'Restaurar' : 'Reset'}
+              </button>
+            )}
+          </div>
+          {/* Quick dark presets */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            {['#0A0A0F', '#060D14', '#0F0804', '#060F08', '#080613', '#111111', '#1a1a1a', '#0d0d0d'].map(c => (
+              <button key={c} onClick={() => setBgColor(c)} title={c}
+                style={{ width: 28, height: 28, borderRadius: 6, background: c, border: bgColor === c ? `2px solid ${accentColor}` : '2px solid rgba(255,255,255,0.12)', cursor: 'pointer', outline: 'none', transition: 'all 0.15s' }} />
+            ))}
           </div>
         </div>
 
@@ -609,38 +646,4 @@ export default function ProfilePage() {
                   <tbody>
                     {dailyLogs.map((log: any) => (
                       <tr key={log.id} style={{ borderTop: `1px solid ${BORDER}` }}>
-                        <td style={{ padding: '5px 6px', color: T2 }}>{new Date(log.date).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' })}</td>
-                        <td style={{ padding: '5px 6px', color: T1, fontFamily: 'DM Mono, monospace' }}>{log.weight ? `${log.weight}` : '—'}</td>
-                        <td style={{ padding: '5px 6px', color: accentColor, fontFamily: 'DM Mono, monospace' }}>{log.energy ?? '—'}</td>
-                        <td style={{ padding: '5px 6px', color: T2, fontFamily: 'DM Mono, monospace' }}>{log.sleep ?? '—'}</td>
-                        <td style={{ padding: '5px 6px', color: '#FF6B6B', fontFamily: 'DM Mono, monospace' }}>{log.stress ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Acceso a submenús ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { key: 'settings', icon: '⚙️', title: isEs ? 'Ajustes y personalización' : 'Settings & customization', desc: isEs ? 'Idioma, colores, tema, notificaciones' : 'Language, colors, theme, notifications' },
-            { key: 'account', icon: '👤', title: isEs ? 'Cuenta y plan' : 'Account & plan', desc: isEs ? 'Sesión, plan actual, zona de peligro' : 'Session, current plan, danger zone' },
-          ].map(item => (
-            <button key={item.key} onClick={() => setView(item.key as View)}
-              style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 14, padding: '15px 16px', background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}>
-              <span style={{ fontSize: 20 }}>{item.icon}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, color: T1, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>{item.title}</div>
-                <div style={{ fontSize: 11, color: T3, fontFamily: 'DM Mono, monospace', marginTop: 2 }}>{item.desc}</div>
-              </div>
-              <span style={{ color: T3, fontSize: 20 }}>›</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
+                        <td style={{ padding: '5px 6px', color: T2 }}>{new Date(log.date).toLocaleDateString(isEs ? 'es-E
