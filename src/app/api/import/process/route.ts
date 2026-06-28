@@ -1,7 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+
+// Admin client for storage — bypasses RLS correctly with service role key
+function adminStorage() {
+  return createClient(
+    (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim(),
+    (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export const maxDuration = 60
 
@@ -164,17 +174,17 @@ export async function POST(request: Request) {
       .update({ import_status: 'processing' })
       .eq('id', importedFileId)
 
-    // Download from storage — try multiple paths for resilience
+    // Download from storage using admin client (SSR client lacks auth header for storage)
     let fileData: any = null
     const storagePath = importedFile.storage_path as string
     const pathsToTry = [
       storagePath,
-      `imports/${storagePath}`,
       storagePath.replace(/^imports\//, ''),
     ]
 
+    const storageAdmin = adminStorage()
     for (const tryPath of pathsToTry) {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (storageAdmin as any)
         .storage.from('imports').download(tryPath)
       if (data && !error) {
         fileData = data
@@ -185,7 +195,7 @@ export async function POST(request: Request) {
 
     if (!fileData) {
       const prefix = storagePath.split('/')[0]
-      const { data: listData } = await (supabase as any)
+      const { data: listData } = await (storageAdmin as any)
         .storage.from('imports').list(prefix, { limit: 10 })
       console.log(`[import/process] bucket/${prefix} contents:`, JSON.stringify(listData?.map((f: any) => f.name)))
 

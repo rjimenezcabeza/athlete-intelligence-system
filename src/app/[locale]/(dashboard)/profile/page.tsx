@@ -146,25 +146,29 @@ export default function ProfilePage() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const signedRes = await fetch('/api/profile/avatar', {
+      // Read file as base64 and upload via server (avoids signed URL 400 bug)
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const contentType = file.type || 'image/jpeg'
+      const res = await fetch('/api/profile/avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type })
+        body: JSON.stringify({ base64, contentType })
       })
-      if (!signedRes.ok) return
-      const { signedUrl, publicUrl } = await signedRes.json()
-      await fetch(signedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file
-      })
-      await fetch('/api/profile/avatar', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatarUrl: publicUrl })
-      })
-      setProfile((p: any) => ({ ...p, avatar_url: publicUrl }))
-    } catch {}
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('[avatar] upload failed:', err)
+        return
+      }
+      const { avatarUrl } = await res.json()
+      setProfile((p: any) => ({ ...p, avatar_url: avatarUrl }))
+    } catch (err) {
+      console.error('[avatar] exception:', err)
+    }
   }
 
   const handleDailySave = async () => {

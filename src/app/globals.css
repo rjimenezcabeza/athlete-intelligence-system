@@ -50,4 +50,5 @@ input[type="number"]{-moz-appearance:textfield}
 .input:focus{border-color:rgba(200,255,0,0.5)}
 .btn-primary{display:block;width:100%;background:linear-gradient(135deg,#C8FF00,#88DD00);color:#0A0A0F;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;font-family:'Syne',sans-serif;letter-spacing:0.04em;cursor:pointer;box-shadow:0 4px 20px rgba(200,255,0,0.3);text-align:center}
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed}
-.btn-danger{wi
+.btn-danger{width:100%;background:rgba(255,107,107,0.08);color:#FF6B6B;border:1px solid rgba(255,107,107,0.2);border-radius:14px;padding:14px;font-size:14px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer}
+.badge-pro{display:inline-flex;align-items:center;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:0.08em;font-family:'Syne',sans-serif;background:rgba(200,255,0,0.15);color:#C8FF00;border:1px solid rgba(200,255,0,0.3)}
