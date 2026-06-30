@@ -14,6 +14,7 @@ interface SessionRow {
 }
 
 type FilterPeriod = 'week' | 'month' | 'year'
+type ViewMode = 'list' | 'grid' | 'compact'
 
 function buildWeeklyChart(sessions: SessionRow[]) {
   const weeks: Record<string, number> = {}
@@ -38,6 +39,7 @@ export default function HistoryPage() {
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterPeriod>('month')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [deleteModal, setDeleteModal] = useState<SessionRow | null>(null)
@@ -103,19 +105,53 @@ export default function HistoryPage() {
 
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* FILTER PILLS */}
-        <div style={{ display: 'flex', gap: 8, ...animStyle(0) }}>
-          {(['week', 'month', 'year'] as FilterPeriod[]).map(p => (
-            <button key={p} onClick={() => setFilter(p)} style={{
-              padding: '8px 18px', borderRadius: 100, fontSize: 12, fontWeight: 700,
-              fontFamily: 'Syne, sans-serif', cursor: 'pointer', transition: 'all 0.15s',
-              background: filter === p ? ACC : CARD,
-              color: filter === p ? BG : T2,
-              border: '1px solid ' + (filter === p ? 'transparent' : BORDER),
-            }}>
-              {isEs ? filterLabels[p].es : filterLabels[p].en}
-            </button>
-          ))}
+        {/* FILTER PILLS + VIEW MODE TOGGLE */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', ...animStyle(0) }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['week', 'month', 'year'] as FilterPeriod[]).map(p => (
+              <button key={p} onClick={() => setFilter(p)} style={{
+                padding: '8px 18px', borderRadius: 100, fontSize: 12, fontWeight: 700,
+                fontFamily: 'Syne, sans-serif', cursor: 'pointer', transition: 'all 0.15s',
+                background: filter === p ? ACC : CARD,
+                color: filter === p ? BG : T2,
+                border: '1px solid ' + (filter === p ? 'transparent' : BORDER),
+              }}>
+                {isEs ? filterLabels[p].es : filterLabels[p].en}
+              </button>
+            ))}
+          </div>
+          {/* View mode icons */}
+          <div style={{ display: 'flex', gap: 2, background: CARD, border: '1px solid ' + BORDER, borderRadius: 10, padding: 4 }}>
+            {([
+              { mode: 'list' as ViewMode, icon: (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+                  <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                </svg>
+              )},
+              { mode: 'grid' as ViewMode, icon: (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                  <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                </svg>
+              )},
+              { mode: 'compact' as ViewMode, icon: (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/>
+                  <line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="20" y2="18"/>
+                </svg>
+              )},
+            ]).map(({ mode, icon }) => (
+              <button key={mode} onClick={() => setViewMode(mode)} style={{
+                padding: '5px 8px', borderRadius: 7, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                background: viewMode === mode ? 'rgba(255,255,255,0.08)' : 'transparent',
+                color: viewMode === mode ? T1 : T3,
+                transition: 'all 0.15s',
+              }}>
+                {icon}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* KPI STRIP */}
@@ -161,7 +197,68 @@ export default function HistoryPage() {
           </div>
         )}
 
-        {/* SESSION LIST */}
+        {/* GRID VIEW */}
+        {!loading && viewMode === 'grid' && filtered.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...animStyle(160) }}>
+            {filtered.map(s => {
+              const date = new Date(s.session_date)
+              const dayLabelLower = (s.day_label ?? '').toLowerCase()
+              const tagColor = dayLabelLower.includes('push') ? '#FF6B35' : dayLabelLower.includes('pull') ? '#00D4FF' : dayLabelLower.includes('leg') || dayLabelLower.includes('pier') ? '#A855F7' : ACC
+              return (
+                <button key={s.id} onClick={() => setSelectedSessionId(s.id)} style={{
+                  display: 'flex', flexDirection: 'column', gap: 8, padding: '14px',
+                  background: CARD, border: '1px solid ' + BORDER, borderRadius: 14,
+                  textAlign: 'left', cursor: 'pointer',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 700, color: T1, lineHeight: 1 }}>{date.getDate()}</div>
+                    {s.day_label && <span style={{ fontSize: 8, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: tagColor, background: tagColor + '18', borderRadius: 4, padding: '2px 6px', textTransform: 'uppercase' }}>{s.day_label}</span>}
+                  </div>
+                  <div style={{ fontSize: 10, color: T3, fontFamily: 'DM Mono, monospace', textTransform: 'capitalize' }}>
+                    {date.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'short', month: 'short' })}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 11, color: T2, fontFamily: 'DM Mono, monospace' }}>{s.duration_minutes ? `${s.duration_minutes}min` : '—'}</span>
+                    {s.pump_rating != null && <span style={{ fontSize: 11, color: ACC, fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>💪{s.pump_rating}</span>}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* COMPACT VIEW */}
+        {!loading && viewMode === 'compact' && filtered.length > 0 && (
+          <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 16, overflow: 'hidden', ...animStyle(160) }}>
+            {filtered.map((s, i) => {
+              const date = new Date(s.session_date)
+              const dayLabelLower = (s.day_label ?? '').toLowerCase()
+              const tagColor = dayLabelLower.includes('push') ? '#FF6B35' : dayLabelLower.includes('pull') ? '#00D4FF' : dayLabelLower.includes('leg') || dayLabelLower.includes('pier') ? '#A855F7' : ACC
+              return (
+                <button key={s.id} onClick={() => setSelectedSessionId(s.id)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                  background: 'none', border: 'none', borderTop: i > 0 ? '1px solid ' + BORDER : 'none',
+                  cursor: 'pointer', textAlign: 'left',
+                }}>
+                  <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700, color: T3, width: 32, flexShrink: 0 }}>
+                    {date.getDate()}/{date.getMonth() + 1}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 12, color: T1, fontFamily: 'Syne, sans-serif', fontWeight: 600 }}>
+                      {s.day_label || date.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'long' })}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                    {s.duration_minutes && <span style={{ fontSize: 10, color: T3, fontFamily: 'DM Mono, monospace' }}>{s.duration_minutes}m</span>}
+                    {s.day_label && <span style={{ fontSize: 8, fontWeight: 700, color: tagColor, background: tagColor + '18', borderRadius: 4, padding: '2px 6px', textTransform: 'uppercase' }}>{s.day_label}</span>}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* SESSION LIST (default) */}
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, ...animStyle(160) }}>
             {[1,2,3,4].map(i => <Skel key={i} h={64} />)}
@@ -178,7 +275,7 @@ export default function HistoryPage() {
               {isEs ? 'Entrenar' : 'Train'}
             </Link>
           </div>
-        ) : (
+        ) : viewMode !== 'list' ? null : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, ...animStyle(160) }}>
             {/* Group by week — Hevy-style */}
             {(() => {
@@ -244,92 +341,4 @@ export default function HistoryPage() {
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                                 <p style={{ fontWeight: 600, fontSize: 13, color: T1, fontFamily: 'Syne, sans-serif', textTransform: 'capitalize' }}>{label}</p>
-                                {s.day_label && (
-                                  <span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: tagColor, background: tagColor + '15', borderRadius: 4, padding: '2px 6px', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>
-                                    {s.day_label}
-                                  </span>
-                                )}
-                              </div>
-                              <p style={{ fontSize: 11, color: T3, fontFamily: 'DM Mono, monospace' }}>
-                                {s.duration_minutes ? `${s.duration_minutes}min` : '—'}
-                              </p>
-                            </div>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                              {s.pump_rating    != null && <span style={{ fontSize: 12, fontWeight: 700, color: ACC, fontFamily: 'DM Mono, monospace' }}>{s.pump_rating}</span>}
-                              {s.local_fatigue  != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B6B', fontFamily: 'DM Mono, monospace' }}>{s.local_fatigue}</span>}
-                              {s.perceived_recovery != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#4ECDC4', fontFamily: 'DM Mono, monospace' }}>{s.perceived_recovery}</span>}
-                              <span style={{ color: T3, fontSize: 16, transform: isExp ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>›</span>
-                            </div>
-                          </button>
-                          {isExp && (
-                            <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
-                                {[
-                                  { label: 'Pump', value: s.pump_rating ?? '—', color: ACC },
-                                  { label: isEs ? 'Fatiga' : 'Fatigue', value: s.local_fatigue ?? '—', color: '#FF6B6B' },
-                                  { label: isEs ? 'Recuper.' : 'Recovery', value: s.perceived_recovery ?? '—', color: '#4ECDC4' },
-                                  { label: isEs ? 'Duración' : 'Duration', value: s.duration_minutes ? `${s.duration_minutes}m` : '—', color: T1 },
-                                ].map(m => (
-                                  <div key={m.label}>
-                                    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T3, marginBottom: 3 }}>{m.label}</p>
-                                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}</p>
-                                  </div>
-                                ))}
-                              </div>
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <button onClick={() => setSelectedSessionId(s.id)} style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#16161f', color: T2, border: '1px solid ' + BORDER, cursor: 'pointer' }}>
-                                  {isEs ? 'Ver detalle →' : 'View detail →'}
-                                </button>
-                                <button onClick={() => setDeleteModal(s)} style={{ padding: '10px 14px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.08)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.15)', cursor: 'pointer' }}>
-                                  {isEs ? 'Eliminar' : 'Delete'}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))
-            })()}
-          </div>
-        )}
-      </div>
-
-      {/* SESSION DETAIL MODAL */}
-      {selectedSessionId && (
-        <SessionDetailModal
-          sessionId={selectedSessionId}
-          onClose={() => setSelectedSessionId(null)}
-          locale={locale}
-        />
-      )}
-
-      {/* DELETE MODAL */}
-      {deleteModal && (
-        <div onClick={() => !deleting && setDeleteModal(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#111118', border: '1px solid rgba(255,107,107,0.2)', borderRadius: 22, padding: '28px 24px', maxWidth: 340, width: '100%' }}>
-            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 700, color: T1, marginBottom: 10 }}>
-              {isEs ? '¿Eliminar sesión?' : 'Delete session?'}
-            </p>
-            <p style={{ fontSize: 13, color: T2, marginBottom: 6, lineHeight: 1.5 }}>
-              {isEs ? 'Esta acción es permanente. Se eliminarán todos los ejercicios y series de la sesión del' : 'This action is permanent. All exercises and sets from the session on'}
-            </p>
-            <p style={{ fontSize: 14, fontWeight: 700, color: '#FF6B6B', marginBottom: 24, fontFamily: 'DM Mono, monospace' }}>
-              {new Date(deleteModal.session_date).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setDeleteModal(null)} disabled={deleting} style={{ flex: 1, padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#1a1a2e', color: T2, border: 'none', cursor: 'pointer' }}>
-                {isEs ? 'Cancelar' : 'Cancel'}
-              </button>
-              <button onClick={doDelete} disabled={deleting} style={{ flex: 1, padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.15)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.3)', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}>
-                {deleting ? '...' : (isEs ? 'Eliminar' : 'Delete')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+        

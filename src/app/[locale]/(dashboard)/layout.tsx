@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import BottomNav from '@/components/layout/BottomNav'
 import { OfflineIndicator } from '@/components/shared/OfflineIndicator'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
@@ -61,9 +62,5 @@ export default async function DashboardLayout({
       <style dangerouslySetInnerHTML={{ __html: `:root { --bg-primary: ${bgPrimary}; }` }} />
       <div style={cssVarsWithoutBg as React.CSSProperties}>
         <OfflineIndicator />
-        <main className="flex-1 pb-24 overflow-y-auto">{children}</main>
-        <BottomNav locale={locale} />
-      </div>
-    </ThemeProvider>
-  )
-}
+        {/* Floating profile icon — top-right, always accessible */}
+        <Link href={`/${locale}/profile`} style={{

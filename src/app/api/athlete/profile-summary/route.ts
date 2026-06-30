@@ -16,20 +16,20 @@ export async function GET() {
 
     const { data: profile } = await (supabase as any)
       .from('athlete_profiles')
-      .select('id, display_name, body_weight_kg, training_experience_years, primary_goal, avatar_url')
+      .select('id, display_name, body_weight_kg, height_cm, date_of_birth, gender, training_experience_years, primary_goal, avatar_url')
       .eq('user_id', user.id)
       .single()
 
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-    const [sessionsResult, latestImportResult, lastSessionResult] = await Promise.all([
+    const [sessionsResult, latestImportResult, lastSessionResult, prResult] = await Promise.all([
       (supabase as any)
         .from('training_sessions')
         .select('id', { count: 'exact', head: true })
         .eq('athlete_id', profile.id),
       (supabase as any)
         .from('imported_files')
-        .select('id, original_filename, extraction_confidence, extracted_data, uploaded_at')
+        .select('id, original_filename, extraction_confidence, extracted_data, uploaded_at, import_status')
         .eq('athlete_id', profile.id)
         .in('import_status', ['approved', 'review_required'])
         .order('uploaded_at', { ascending: false })
@@ -41,7 +41,11 @@ export async function GET() {
         .eq('athlete_id', profile.id)
         .order('session_date', { ascending: false })
         .limit(1)
-        .maybeSingle()
+        .maybeSingle(),
+      (supabase as any)
+        .from('sets')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_personal_record', true)
     ])
 
     const latestImport = latestImportResult.data
@@ -66,6 +70,9 @@ export async function GET() {
       profile: {
         displayName: profile.display_name,
         bodyWeightKg: profile.body_weight_kg ? Number(profile.body_weight_kg) : null,
+        heightCm: profile.height_cm ? Number(profile.height_cm) : null,
+        dateOfBirth: profile.date_of_birth ?? null,
+        gender: profile.gender ?? null,
         trainingExperienceYears: profile.training_experience_years,
         primaryGoal: profile.primary_goal,
         trainingDaysDetected: trainingDays,
@@ -75,20 +82,9 @@ export async function GET() {
       nutrition,
       stats: {
         totalSessions: sessionsResult.count || 0,
-        totalPRs: 0,
+        totalPRs: prResult.count || 0,
         activeMesocycle: null,
         lastSessionDate: lastSessionResult.data?.session_date || null
       },
       latestImport: latestImport ? {
-        id: latestImport.id,
-        filename: latestImport.original_filename,
-        confidence: latestImport.extraction_confidence,
-        extractedData: ed,
-        uploadedAt: latestImport.uploaded_at
-      } : null
-    })
-  } catch (error) {
-    console.error('[athlete/profile-summary]', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
-  }
-}
+  

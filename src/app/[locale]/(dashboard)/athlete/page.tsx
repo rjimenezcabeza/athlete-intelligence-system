@@ -2,17 +2,25 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 
-type AthleteTab = 'overview' | 'program' | 'nutrition' | 'history' | 'coach'
+const BG   = 'var(--bg-primary,#0A0A0F)'
+const CARD = 'var(--card-bg,rgba(255,255,255,0.04))'
+const BDR  = 'var(--card-border,rgba(255,255,255,0.08))'
+const T1   = 'var(--text-primary,#fff)'
+const T2   = 'var(--text-secondary,#888)'
+const T3   = 'var(--text-tertiary,#44445a)'
+const ACC  = 'var(--accent-color,#C8FF00)'
 
 interface AthleteData {
   profile: {
     displayName: string | null
     bodyWeightKg: number | null
+    heightCm?: number | null
     trainingExperienceYears: number | null
     primaryGoal: string | null
-    trainingDaysDetected: number | null
     trainingSplitDetected: string | null
+    trainingDaysDetected: number | null
     avatarUrl: string | null
   }
   nutrition: {
@@ -35,25 +43,23 @@ interface AthleteData {
     totalPRs: number
     activeMesocycle: string | null
     lastSessionDate: string | null
+    currentStreak?: number
   }
 }
 
-const TABS: Record<AthleteTab, { es: string; en: string; icon: string }> = {
-  overview:  { es: 'Resumen',   en: 'Overview',   icon: '📊' },
-  program:   { es: 'Programa',  en: 'Program',    icon: '🏋️' },
-  nutrition: { es: 'Nutricion', en: 'Nutrition',  icon: '🥗' },
-  history:   { es: 'Historial', en: 'History',    icon: '📅' },
-  coach:     { es: 'Coach',     en: 'Coach',      icon: '🤖' },
-}
-
-const accent = '#C8FF00'
+const Skel = ({ h, w = '100%' }: { h: number; w?: string }) => (
+  <div style={{
+    height: h, width: w,
+    background: 'linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%)',
+    backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', borderRadius: 10,
+  }} />
+)
 
 export default function AthletePage() {
-  const params = useParams()
-  const locale = (params?.locale as string) || 'es'
-  const isEs = locale === 'es'
-  const [activeTab, setActiveTab] = useState<AthleteTab>('overview')
-  const [data, setData] = useState<AthleteData | null>(null)
+  const params  = useParams()
+  const locale  = (params?.locale as string) || 'es'
+  const isEs    = locale !== 'en'
+  const [data, setData]       = useState<AthleteData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -64,270 +70,206 @@ export default function AthletePage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) {
-    return (
-      <div style={{ padding: '20px', minHeight: '100vh', background: '#0A0A0F' }}>
-        <div style={{ height: '20px', width: '140px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', marginBottom: '20px' }} />
-        {[1,2,3].map(i => <div key={i} style={{ height: '80px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '10px' }} />)}
-      </div>
-    )
-  }
+  const ed           = data?.latestImport?.extractedData
+  const program      = ed?.training_program
+  const programDays: any[]  = program?.days ?? []
+  const supplements: any[]  = ed?.supplements ?? []
+  const hasNutrition  = !!data?.nutrition?.caloriesTarget
+  const hasProgram    = programDays.length > 0
+  const hasSupplements = supplements.length > 0
 
-  const ed = data?.latestImport?.extractedData
-  const programDays: any[] = ed?.training_program?.days ?? []
+  const kpis = [
+    { label: isEs ? 'Sesiones' : 'Sessions', value: data?.stats?.totalSessions ?? 0, color: T1 },
+    { label: 'PRs', value: data?.stats?.totalPRs ?? 0, color: ACC },
+    { label: isEs ? 'Racha' : 'Streak', value: `${data?.stats?.currentStreak ?? 0}d`, color: '#FFC107' },
+  ]
+
+  const cards = [
+    {
+      id: 'program', icon: '💪',
+      title: isEs ? 'Programa' : 'Program',
+      sub: hasProgram ? `${program?.split_type ?? ''} · ${programDays.length} ${isEs ? 'días' : 'days'}` : isEs ? 'Sin datos' : 'No data',
+      preview: hasProgram
+        ? programDays.slice(0, 3).map((d: any) => d.day_label || `Día ${d.day_number}`).join(' · ')
+        : isEs ? 'Importa tu programa de entreno' : 'Import your training plan',
+      hasData: hasProgram, href: `/${locale}/athlete/program`, accentColor: '#4ADE80',
+    },
+    {
+      id: 'nutrition', icon: '🥗',
+      title: isEs ? 'Nutrición' : 'Nutrition',
+      sub: hasNutrition ? `${data!.nutrition.caloriesTarget} kcal/día` : isEs ? 'Sin datos' : 'No data',
+      preview: hasNutrition
+        ? `P:${data!.nutrition.proteinG}g · C:${data!.nutrition.carbsG}g · G:${data!.nutrition.fatG}g`
+        : isEs ? 'Importa tu plan nutricional' : 'Import your nutrition plan',
+      hasData: hasNutrition, href: `/${locale}/athlete/nutrition`, accentColor: '#FFA500',
+    },
+    {
+      id: 'supplements', icon: '💊',
+      title: isEs ? 'Suplementos' : 'Supplements',
+      sub: hasSupplements ? `${supplements.length} ${isEs ? 'productos' : 'products'}` : isEs ? 'Sin datos' : 'No data',
+      preview: hasSupplements
+        ? supplements.slice(0, 2).map((s: any) => s.name).join(', ')
+        : isEs ? 'Extrae tu pila de suplementos' : 'Extract your supplement stack',
+      hasData: hasSupplements, href: `/${locale}/athlete/nutrition#supplements`, accentColor: '#A78BFA',
+    },
+    {
+      id: 'metrics', icon: '⚖️',
+      title: isEs ? 'Métricas' : 'Metrics',
+      sub: data?.profile?.bodyWeightKg ? `${data.profile.bodyWeightKg} kg` : isEs ? 'Sin datos' : 'No data',
+      preview: data?.profile?.heightCm
+        ? `${data.profile.heightCm}cm · ${data.profile.trainingExperienceYears ?? '?'} ${isEs ? 'años exp.' : 'yrs exp.'}`
+        : isEs ? 'Peso, talla, experiencia' : 'Weight, height, experience',
+      hasData: !!data?.profile?.bodyWeightKg, href: `/${locale}/athlete/metrics`, accentColor: '#38BDF8',
+    },
+  ]
 
   return (
-    <div style={{ paddingBottom: '100px', minHeight: '100vh', background: '#0A0A0F' }}>
+    <div style={{ minHeight: '100vh', background: BG, color: T1, paddingBottom: 100 }}>
+      <style>{`
+        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes fadeUp  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .card-tap { transition: transform .13s; }
+        .card-tap:active { transform: scale(0.96); }
+      `}</style>
 
-      {/* Header */}
-      <div style={{ padding: '20px 20px 0', background: 'linear-gradient(180deg, rgba(200,255,0,0.06) 0%, transparent 100%)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: data?.profile?.avatarUrl ? 'transparent' : 'rgba(200,255,0,0.15)', border: '2px solid rgba(200,255,0,0.3)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {data?.profile?.avatarUrl ? (
-              <img src={data.profile.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <span style={{ fontSize: '20px', fontWeight: '700', color: accent, fontFamily: 'Syne, sans-serif' }}>
-                {data?.profile?.displayName?.[0]?.toUpperCase() || 'A'}
-              </span>
-            )}
+      {/* HEADER */}
+      <div style={{ padding:'52px 20px 16px', animation:'fadeUp .35s ease-out' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:14 }}>
+          <div style={{
+            width:52, height:52, borderRadius:'50%', flexShrink:0,
+            background: data?.profile?.avatarUrl ? 'transparent' : 'rgba(255,255,255,.06)',
+            border:`2px solid ${BDR}`, overflow:'hidden',
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}>
+            {loading ? <Skel h={52} w="52px" /> :
+              data?.profile?.avatarUrl
+                ? <img src={data.profile.avatarUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                : <span style={{fontSize:18,fontWeight:800,color:ACC,fontFamily:'Syne,sans-serif'}}>
+                    {data?.profile?.displayName?.[0]?.toUpperCase() ?? 'A'}
+                  </span>
+            }
           </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#fff', fontFamily: 'Syne, sans-serif' }}>
-              {data?.profile?.displayName || (isEs ? 'Mi perfil' : 'My profile')}
-            </h1>
-            <div style={{ fontSize: '12px', color: '#666', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>
-              {data?.profile?.primaryGoal || 'hypertrophy'} · {data?.profile?.trainingExperienceYears || '?'} {isEs ? 'años' : 'years'} · {data?.profile?.trainingSplitDetected || 'Custom'}
-            </div>
+          <div style={{flex:1,minWidth:0}}>
+            {loading ? <Skel h={20} w="140px" /> :
+              <h1 style={{margin:0,fontSize:20,fontWeight:800,fontFamily:'Syne,sans-serif',color:T1,letterSpacing:'-0.02em'}}>
+                {data?.profile?.displayName ?? (isEs ? 'Mi perfil' : 'My profile')}
+              </h1>
+            }
+            <p style={{margin:'3px 0 0',fontSize:11,color:T3,fontFamily:'DM Mono,monospace'}}>
+              {data?.profile?.primaryGoal ?? 'hypertrophy'}
+              {data?.profile?.trainingSplitDetected ? ` · ${data.profile.trainingSplitDetected}` : ''}
+              {data?.profile?.trainingExperienceYears ? ` · ${data.profile.trainingExperienceYears} ${isEs?'años':'yrs'}` : ''}
+            </p>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '1px' }}>
-          {(Object.entries(TABS) as [AthleteTab, typeof TABS.overview][]).map(([key, tab]) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              style={{
-                padding: '8px 14px',
-                background: activeTab === key ? 'rgba(200,255,0,0.12)' : 'transparent',
-                border: `1px solid ${activeTab === key ? 'rgba(200,255,0,0.3)' : 'rgba(255,255,255,0.07)'}`,
-                borderRadius: '8px',
-                color: activeTab === key ? accent : '#666',
-                fontSize: '12px',
-                cursor: 'pointer',
-                fontFamily: 'DM Mono, monospace',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-              }}
-            >
-              <span>{tab.icon}</span>
-              <span>{isEs ? tab.es : tab.en}</span>
-            </button>
+        {/* KPI strip */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+          {kpis.map(k => (
+            <div key={k.label} style={{background:CARD,border:`1px solid ${BDR}`,borderRadius:12,padding:'10px 0',textAlign:'center'}}>
+              {loading ? <div style={{display:'flex',justifyContent:'center'}}><Skel h={22} w="60%"/></div> :
+                <p style={{margin:0,fontFamily:'DM Mono,monospace',fontSize:22,fontWeight:700,color:k.color}}>{k.value}</p>
+              }
+              <p style={{margin:'3px 0 0',fontSize:9,color:T3,fontFamily:'Syne,sans-serif',fontWeight:700,letterSpacing:'.08em',textTransform:'uppercase'}}>{k.label}</p>
+            </div>
           ))}
         </div>
       </div>
 
-      <div style={{ padding: '20px' }}>
+      <div style={{padding:'0 16px',animation:'fadeUp .45s ease-out .1s both'}}>
 
-        {/* OVERVIEW */}
-        {activeTab === 'overview' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-              {[
-                { label: isEs ? 'Sesiones' : 'Sessions', value: data?.stats?.totalSessions || 0, icon: '🏋️', color: accent },
-                { label: 'PRs', value: data?.stats?.totalPRs || 0, icon: '🏆', color: '#FFC107' },
-                { label: isEs ? 'Peso corporal' : 'Body weight', value: data?.profile?.bodyWeightKg ? `${data.profile.bodyWeightKg}kg` : '-', icon: '⚖️', color: '#888' },
-                { label: isEs ? 'Split' : 'Split', value: data?.profile?.trainingSplitDetected || (isEs ? 'Ninguno' : 'None'), icon: '📅', color: '#888' },
-              ].map((kpi, i) => (
-                <div key={i} style={{ padding: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px' }}>
-                  <div style={{ fontSize: '20px', marginBottom: '6px' }}>{kpi.icon}</div>
-                  <div style={{ fontSize: '20px', fontWeight: '800', color: kpi.color, fontFamily: 'DM Mono, monospace', marginBottom: '2px' }}>{kpi.value}</div>
-                  <div style={{ fontSize: '11px', color: '#555', fontFamily: 'DM Mono, monospace' }}>{kpi.label}</div>
-                </div>
-              ))}
+        {/* PENDING IMPORT BANNER */}
+        {!loading && data?.latestImport && (
+          <div style={{
+            marginBottom:14,padding:'12px 14px',
+            background:'rgba(200,255,0,.05)',border:'1px solid rgba(200,255,0,.18)',
+            borderRadius:12,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,
+          }}>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{margin:0,fontSize:11,color:ACC,fontFamily:'DM Mono,monospace',fontWeight:600}}>
+                {'📎 '}{isEs?'Archivo analizado':'Analyzed file'}
+                <span style={{marginLeft:8,opacity:.6}}>{Math.round((data.latestImport.confidence||0)*100)}% precisión</span>
+              </p>
+              <p style={{margin:'2px 0 0',fontSize:11,color:T2,fontFamily:'DM Mono,monospace',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {data.latestImport.filename}
+              </p>
             </div>
-
-            {data?.latestImport && (
-              <div style={{ padding: '16px', background: 'rgba(200,255,0,0.04)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: accent, fontFamily: 'Syne, sans-serif' }}>
-                    {isEs ? 'Ultimo archivo analizado' : 'Latest analyzed file'}
-                  </span>
-                  <span style={{ fontSize: '10px', color: '#555', fontFamily: 'DM Mono, monospace' }}>
-                    {Math.round((data.latestImport.confidence || 0) * 100)}% {isEs ? 'precision' : 'accuracy'}
-                  </span>
-                </div>
-                <div style={{ fontSize: '13px', color: '#888', fontFamily: 'DM Mono, monospace' }}>
-                  {data.latestImport.filename}
-                </div>
-                {ed && (
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
-                    {ed.training_program?.split_type && (
-                      <span style={{ fontSize: '11px', color: accent, fontFamily: 'DM Mono, monospace' }}>
-                        {ed.training_program.split_type}
-                      </span>
-                    )}
-                    {ed.nutrition?.calories_target && (
-                      <span style={{ fontSize: '11px', color: '#888', fontFamily: 'DM Mono, monospace' }}>
-                        {ed.nutrition.calories_target}kcal
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {!data?.latestImport && (
-              <a href={`/${locale}/import`} style={{ display: 'block', padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '12px', textAlign: 'center', textDecoration: 'none' }}>
-                <div style={{ fontSize: '28px', marginBottom: '8px' }}>📎</div>
-                <div style={{ fontSize: '13px', color: accent, fontFamily: 'Syne, sans-serif', marginBottom: '4px' }}>
-                  {isEs ? 'Importa tu programa' : 'Import your program'}
-                </div>
-                <div style={{ fontSize: '11px', color: '#555' }}>
-                  {isEs ? 'PDF, imagen, Excel — la IA lo analiza' : 'PDF, image, Excel — AI analyzes it'}
-                </div>
-              </a>
-            )}
+            <Link href={`/${locale}/import`} style={{
+              padding:'6px 14px',borderRadius:8,background:ACC,
+              color:'#0A0A0F',fontSize:11,fontWeight:700,fontFamily:'Syne,sans-serif',
+              textDecoration:'none',whiteSpace:'nowrap',flexShrink:0,
+            }}>
+              {isEs?'Ver →':'View →'}
+            </Link>
           </div>
         )}
 
-        {/* PROGRAMA */}
-        {activeTab === 'program' && (
-          <div>
-            {programDays.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ fontSize: '12px', color: '#555', fontFamily: 'DM Mono, monospace', marginBottom: '4px' }}>
-                  {ed?.training_program?.split_type || 'Custom'} · {ed?.training_program?.days_per_week || programDays.length} {isEs ? 'dias/semana' : 'days/week'}
+        {/* CARDS GRID 2×2 */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+          {cards.map((card,i)=>(
+            <Link key={card.id} href={card.href} style={{textDecoration:'none'}}>
+              <div className="card-tap" style={{
+                padding:'16px 14px',background:CARD,border:`1px solid ${BDR}`,borderRadius:16,
+                display:'flex',flexDirection:'column',gap:8,minHeight:130,
+                position:'relative',overflow:'hidden',
+                animation:`fadeUp .4s ease-out ${i*60+200}ms both`,
+              }}>
+                {card.hasData && (
+                  <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${card.accentColor},transparent)`,borderRadius:'16px 16px 0 0'}}/>
+                )}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                  <span style={{fontSize:26}}>{card.icon}</span>
+                  {card.hasData && <div style={{width:8,height:8,borderRadius:'50%',background:card.accentColor}}/>}
                 </div>
-                {programDays.map((day: any, i: number) => (
-                  <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#ddd', fontFamily: 'Syne, sans-serif' }}>
-                        {day.day_label || `Dia ${day.day_number}`}
-                      </span>
-                      <span style={{ fontSize: '11px', color: '#555', fontFamily: 'DM Mono, monospace' }}>
-                        {day.exercises?.length || 0} {isEs ? 'ejercicios' : 'exercises'}
-                      </span>
-                    </div>
-                    <div style={{ padding: '8px 14px' }}>
-                      {(day.exercises || []).map((ex: any, j: number) => (
-                        <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderTop: j > 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                          <div>
-                            <span style={{ fontSize: '13px', color: ex.matched_exercise ? '#ddd' : '#666', fontFamily: 'DM Mono, monospace' }}>{ex.name}</span>
-                            {ex.matched_exercise && <span style={{ fontSize: '9px', color: accent, marginLeft: '6px' }}>✓</span>}
-                          </div>
-                          <span style={{ fontSize: '12px', color: '#555', fontFamily: 'DM Mono, monospace' }}>
-                            {ex.sets && ex.rep_range_min && ex.rep_range_max
-                              ? `${ex.sets}x${ex.rep_range_min}-${ex.rep_range_max}`
-                              : ex.sets ? `${ex.sets} sets` : '-'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#555', fontSize: '13px' }}>
-                <div style={{ fontSize: '32px', marginBottom: '12px' }}>🏋️</div>
-                {isEs ? 'Sin programa importado.' : 'No imported program.'}
-                <br />
-                <a href={`/${locale}/import`} style={{ color: accent, textDecoration: 'none', fontSize: '13px', marginTop: '12px', display: 'inline-block' }}>
-                  {isEs ? 'Importar programa →' : 'Import program →'}
-                </a>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* NUTRICION */}
-        {activeTab === 'nutrition' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {data?.nutrition?.caloriesTarget ? (
-              <>
-                <div style={{ padding: '20px', background: 'rgba(200,255,0,0.05)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: '14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '40px', fontWeight: '800', color: accent, fontFamily: 'DM Mono, monospace' }}>
-                    {data.nutrition.caloriesTarget.toLocaleString()}
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#888' }}>{isEs ? 'kcal objetivo/dia' : 'target kcal/day'}</div>
+                <div>
+                  <p style={{margin:0,fontSize:13,fontWeight:700,color:T1,fontFamily:'Syne,sans-serif'}}>{card.title}</p>
+                  <p style={{margin:'2px 0 0',fontSize:11,color:card.hasData?card.accentColor:T3,fontFamily:'DM Mono,monospace'}}>{card.sub}</p>
                 </div>
-
-                {(data.nutrition.proteinG || data.nutrition.carbsG || data.nutrition.fatG) && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    {[
-                      { label: isEs ? 'Proteina' : 'Protein', value: data.nutrition.proteinG, color: '#4CAF50' },
-                      { label: isEs ? 'Carbos' : 'Carbs', value: data.nutrition.carbsG, color: '#FF9800' },
-                      { label: isEs ? 'Grasas' : 'Fats', value: data.nutrition.fatG, color: '#2196F3' },
-                    ].map((macro, i) => (
-                      <div key={i} style={{ padding: '14px 10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '24px', fontWeight: '700', color: macro.color, fontFamily: 'DM Mono, monospace' }}>{macro.value || '-'}</div>
-                        <div style={{ fontSize: '10px', color: '#555', fontFamily: 'DM Mono, monospace' }}>{macro.label} (g)</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {data.nutrition.mealsPerDay && (
-                  <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '13px', color: '#888' }}>{isEs ? 'Comidas al dia' : 'Meals per day'}</span>
-                    <span style={{ fontSize: '13px', color: '#ddd', fontFamily: 'DM Mono, monospace', fontWeight: '600' }}>{data.nutrition.mealsPerDay}</span>
-                  </div>
-                )}
-
-                {data.nutrition.nutritionNotes && (
-                  <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '11px', color: '#555', marginBottom: '4px' }}>{isEs ? 'Notas' : 'Notes'}</div>
-                    <p style={{ margin: 0, fontSize: '13px', color: '#888', lineHeight: '1.5' }}>{data.nutrition.nutritionNotes}</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#555', fontSize: '13px' }}>
-                <div style={{ fontSize: '32px', marginBottom: '12px' }}>🥗</div>
-                {isEs ? 'Sin datos de nutricion. Importa un archivo con tu plan nutricional.' : 'No nutrition data. Import a file with your nutrition plan.'}
-                <br />
-                <a href={`/${locale}/import`} style={{ color: accent, textDecoration: 'none', fontSize: '13px', marginTop: '12px', display: 'inline-block' }}>
-                  {isEs ? 'Importar plan →' : 'Import plan →'}
-                </a>
+                <p style={{margin:0,fontSize:10,color:T3,fontFamily:'DM Mono,monospace',lineHeight:1.4,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                  {loading?'···':card.preview}
+                </p>
+                <div style={{position:'absolute',bottom:12,right:12,fontSize:14,color:T3}}>→</div>
               </div>
-            )}
-          </div>
-        )}
+            </Link>
+          ))}
+        </div>
 
-        {/* HISTORIAL */}
-        {activeTab === 'history' && (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📅</div>
-            <div style={{ fontSize: '14px', color: '#ddd', fontFamily: 'Syne, sans-serif', marginBottom: '8px' }}>
-              {data?.stats?.totalSessions || 0} {isEs ? 'sesiones registradas' : 'sessions logged'}
+        {/* COACH IA BANNER */}
+        <Link href={`/${locale}/coach`} style={{textDecoration:'none',display:'block',marginBottom:12}}>
+          <div className="card-tap" style={{
+            padding:'16px 20px',
+            background:'linear-gradient(135deg,rgba(200,255,0,.07),rgba(200,255,0,.03))',
+            border:'1px solid rgba(200,255,0,.20)',borderRadius:16,
+            display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,
+            animation:'fadeUp .4s ease-out 440ms both',
+          }}>
+            <div>
+              <p style={{margin:0,fontSize:14,fontWeight:800,color:T1,fontFamily:'Syne,sans-serif'}}>
+                {'🤖 '}{isEs?'Coach IA':'AI Coach'}
+              </p>
+              <p style={{margin:'4px 0 0',fontSize:11,color:T2,fontFamily:'DM Mono,monospace'}}>
+                {isEs?'Analiza tu historial y te guía':'Analyzes your history and guides you'}
+              </p>
             </div>
-            {data?.stats?.lastSessionDate && (
-              <div style={{ fontSize: '12px', color: '#555', fontFamily: 'DM Mono, monospace', marginBottom: '16px' }}>
-                {isEs ? 'Ultima:' : 'Last:'} {new Date(data.stats.lastSessionDate).toLocaleDateString()}
-              </div>
-            )}
-            <a href={`/${locale}/history`} style={{ display: 'inline-block', padding: '12px 24px', background: 'rgba(200,255,0,0.1)', border: '1px solid rgba(200,255,0,0.25)', borderRadius: '10px', color: accent, fontSize: '13px', fontFamily: 'DM Mono, monospace', textDecoration: 'none' }}>
-              {isEs ? 'Ver historial completo →' : 'View full history →'}
-            </a>
+            <div style={{padding:'10px 18px',background:ACC,borderRadius:10,color:'#0A0A0F',fontSize:12,fontWeight:700,fontFamily:'Syne,sans-serif',whiteSpace:'nowrap',flexShrink:0}}>
+              {isEs?'Hablar →':'Chat →'}
+            </div>
           </div>
-        )}
+        </Link>
 
-        {/* COACH */}
-        {activeTab === 'coach' && (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>🤖</div>
-            <div style={{ fontSize: '14px', color: '#ddd', fontFamily: 'Syne, sans-serif', marginBottom: '8px' }}>
-              {isEs ? 'Tu AI Coach te esta esperando' : 'Your AI Coach is waiting for you'}
+        {/* IMPORT CTA if no import */}
+        {!loading && !data?.latestImport && (
+          <Link href={`/${locale}/import`} style={{textDecoration:'none',display:'block',animation:'fadeUp .4s ease-out 500ms both'}}>
+            <div style={{padding:'20px',textAlign:'center',background:CARD,border:`1px dashed ${BDR}`,borderRadius:16}}>
+              <p style={{fontSize:28,margin:'0 0 8px'}}>📎</p>
+              <p style={{margin:0,fontSize:14,fontWeight:700,color:ACC,fontFamily:'Syne,sans-serif'}}>
+                {isEs?'Importa tu programa':'Import your program'}
+              </p>
+              <p style={{margin:'4px 0 0',fontSize:11,color:T2,fontFamily:'DM Mono,monospace'}}>
+                {isEs?'PDF · Imagen · Excel — la IA extrae todo automáticamente':'PDF · Image · Excel — AI extracts everything automatically'}
+              </p>
             </div>
-            <div style={{ fontSize: '12px', color: '#666', marginBottom: '20px' }}>
-              {isEs ? 'Con tu historial real + programa importado' : 'With your real history + imported program'}
-            </div>
-            <a href={`/${locale}/coach`} style={{ display: 'inline-block', padding: '14px 32px', background: accent, borderRadius: '12px', color: '#0A0A0F', fontSize: '14px', fontWeight: '700', fontFamily: 'Syne, sans-serif', textDecoration: 'none' }}>
-              {isEs ? 'Hablar con el Coach →' : 'Talk to Coach →'}
-            </a>
-          </div>
+          </Link>
         )}
       </div>
     </div>

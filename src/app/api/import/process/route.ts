@@ -81,6 +81,14 @@ SIEMPRE devuelves un JSON valido con esta estructura exacta (null para campos no
       ]
     }
   ],
+  "supplements": [
+    {
+      "name": "Creatina",
+      "dose": "5g",
+      "timing": "Post-entreno",
+      "purpose": "Fuerza / volumen"
+    }
+  ],
   "confidence": 0.85,
   "notes": null
 }
@@ -395,7 +403,4 @@ export async function POST(request: Request) {
       }
     })
   } catch (error) {
-    console.error('[import/process] error:', error)
-    return NextResponse.json({ error: 'Internal error', details: String(error) }, { status: 500 })
-  }
-}
+    con

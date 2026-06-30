@@ -22,18 +22,21 @@ const ClockIcon = () => (
     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
   </svg>
 )
-const UserIcon = () => (
+const AthleteIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    <circle cx="12" cy="4.5" r="2.5"/>
+    <path d="M5 9.5h4l1 4 2 3 2-3 1-4h4"/>
+    <path d="M9 13.5l-2 5M15 13.5l2 5"/>
   </svg>
 )
 
+// INICIO | ATLETA | + | TÉCNICA | HISTORIAL
 const NAV = [
-  { href: 'dashboard', Icon: HomeIcon, label: 'Inicio' },
-  { href: 'video',    Icon: VideoIcon, label: 'Técnica' },
-  { href: 'session/new', Icon: PlusIcon, label: null, primary: true },
-  { href: 'history',  Icon: ClockIcon, label: 'Historial' },
-  { href: 'profile',  Icon: UserIcon,  label: 'Perfil' },
+  { href: 'dashboard',   Icon: HomeIcon,    label: 'Inicio',    primary: false },
+  { href: 'athlete',     Icon: AthleteIcon, label: 'Atleta',    primary: false },
+  { href: 'session/new', Icon: PlusIcon,    label: null,        primary: true  },
+  { href: 'video',       Icon: VideoIcon,   label: 'Técnica',   primary: false },
+  { href: 'history',     Icon: ClockIcon,   label: 'Historial', primary: false },
 ]
 
 export default function BottomNav({ locale }: { locale: string }) {
@@ -77,13 +80,4 @@ export default function BottomNav({ locale }: { locale: string }) {
           }}>
             <item.Icon />
             {item.label && (
-              <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif', letterSpacing: '0.04em' }}>
-                {item.label}
-              </span>
-            )}
-          </Link>
-        )
-      })}
-    </nav>
-  )
-}
+              <span style={{ fontSize: 10, fontWeight:
