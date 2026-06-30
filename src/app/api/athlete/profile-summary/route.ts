@@ -87,4 +87,16 @@ export async function GET() {
         lastSessionDate: lastSessionResult.data?.session_date || null
       },
       latestImport: latestImport ? {
-  
+        id: latestImport.id,
+        filename: latestImport.original_filename,
+        confidence: latestImport.extraction_confidence,
+        extractedData: ed,
+        uploadedAt: latestImport.uploaded_at,
+        status: latestImport.import_status
+      } : null
+    })
+  } catch (error) {
+    console.error('[athlete/profile-summary]', error)
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  }
+}

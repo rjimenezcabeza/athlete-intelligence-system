@@ -403,4 +403,7 @@ export async function POST(request: Request) {
       }
     })
   } catch (error) {
-    con
+    console.error('[import/process] error:', error)
+    return NextResponse.json({ error: 'Internal error', details: String(error) }, { status: 500 })
+  }
+}

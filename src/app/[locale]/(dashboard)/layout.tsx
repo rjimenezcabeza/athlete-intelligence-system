@@ -64,3 +64,20 @@ export default async function DashboardLayout({
         <OfflineIndicator />
         {/* Floating profile icon — top-right, always accessible */}
         <Link href={`/${locale}/profile`} style={{
+          position: 'fixed', top: 'max(env(safe-area-inset-top,0px) + 12px, 16px)', right: 16, zIndex: 200,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 38, height: 38, borderRadius: '50%',
+          background: 'rgba(10,10,15,0.85)',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.10)',
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary,#888)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+        </Link>
+        <main className="flex-1 pb-24 overflow-y-auto">{children}</main>
+        <BottomNav locale={locale} />
+      </div>
+    </ThemeProvider>
+  )
+}

@@ -80,4 +80,13 @@ export default function BottomNav({ locale }: { locale: string }) {
           }}>
             <item.Icon />
             {item.label && (
-              <span style={{ fontSize: 10, fontWeight:
+              <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif', letterSpacing: '0.04em' }}>
+                {item.label}
+              </span>
+            )}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}

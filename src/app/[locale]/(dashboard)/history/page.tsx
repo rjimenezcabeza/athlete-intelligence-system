@@ -341,4 +341,92 @@ export default function HistoryPage() {
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                                 <p style={{ fontWeight: 600, fontSize: 13, color: T1, fontFamily: 'Syne, sans-serif', textTransform: 'capitalize' }}>{label}</p>
-        
+                                {s.day_label && (
+                                  <span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: tagColor, background: tagColor + '15', borderRadius: 4, padding: '2px 6px', textTransform: 'uppercase', letterSpacing: '0.06em', flexShrink: 0 }}>
+                                    {s.day_label}
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ fontSize: 11, color: T3, fontFamily: 'DM Mono, monospace' }}>
+                                {s.duration_minutes ? `${s.duration_minutes}min` : '—'}
+                              </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                              {s.pump_rating    != null && <span style={{ fontSize: 12, fontWeight: 700, color: ACC, fontFamily: 'DM Mono, monospace' }}>{s.pump_rating}</span>}
+                              {s.local_fatigue  != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B6B', fontFamily: 'DM Mono, monospace' }}>{s.local_fatigue}</span>}
+                              {s.perceived_recovery != null && <span style={{ fontSize: 12, fontWeight: 700, color: '#4ECDC4', fontFamily: 'DM Mono, monospace' }}>{s.perceived_recovery}</span>}
+                              <span style={{ color: T3, fontSize: 16, transform: isExp ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>›</span>
+                            </div>
+                          </button>
+                          {isExp && (
+                            <div style={{ padding: '12px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
+                                {[
+                                  { label: 'Pump', value: s.pump_rating ?? '—', color: ACC },
+                                  { label: isEs ? 'Fatiga' : 'Fatigue', value: s.local_fatigue ?? '—', color: '#FF6B6B' },
+                                  { label: isEs ? 'Recuper.' : 'Recovery', value: s.perceived_recovery ?? '—', color: '#4ECDC4' },
+                                  { label: isEs ? 'Duración' : 'Duration', value: s.duration_minutes ? `${s.duration_minutes}m` : '—', color: T1 },
+                                ].map(m => (
+                                  <div key={m.label}>
+                                    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T3, marginBottom: 3 }}>{m.label}</p>
+                                    <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}</p>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button onClick={() => setSelectedSessionId(s.id)} style={{ flex: 1, display: 'block', textAlign: 'center', padding: '10px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#16161f', color: T2, border: '1px solid ' + BORDER, cursor: 'pointer' }}>
+                                  {isEs ? 'Ver detalle →' : 'View detail →'}
+                                </button>
+                                <button onClick={() => setDeleteModal(s)} style={{ padding: '10px 14px', borderRadius: 11, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.08)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.15)', cursor: 'pointer' }}>
+                                  {isEs ? 'Eliminar' : 'Delete'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
+        )}
+      </div>
+
+      {/* SESSION DETAIL MODAL */}
+      {selectedSessionId && (
+        <SessionDetailModal
+          sessionId={selectedSessionId}
+          onClose={() => setSelectedSessionId(null)}
+          locale={locale}
+        />
+      )}
+
+      {/* DELETE MODAL */}
+      {deleteModal && (
+        <div onClick={() => !deleting && setDeleteModal(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#111118', border: '1px solid rgba(255,107,107,0.2)', borderRadius: 22, padding: '28px 24px', maxWidth: 340, width: '100%' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 700, color: T1, marginBottom: 10 }}>
+              {isEs ? '¿Eliminar sesión?' : 'Delete session?'}
+            </p>
+            <p style={{ fontSize: 13, color: T2, marginBottom: 6, lineHeight: 1.5 }}>
+              {isEs ? 'Esta acción es permanente. Se eliminarán todos los ejercicios y series de la sesión del' : 'This action is permanent. All exercises and sets from the session on'}
+            </p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#FF6B6B', marginBottom: 24, fontFamily: 'DM Mono, monospace' }}>
+              {new Date(deleteModal.session_date).toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setDeleteModal(null)} disabled={deleting} style={{ flex: 1, padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: '#1a1a2e', color: T2, border: 'none', cursor: 'pointer' }}>
+                {isEs ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button onClick={doDelete} disabled={deleting} style={{ flex: 1, padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, fontFamily: 'Syne, sans-serif', background: 'rgba(255,107,107,0.15)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.3)', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? '...' : (isEs ? 'Eliminar' : 'Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
