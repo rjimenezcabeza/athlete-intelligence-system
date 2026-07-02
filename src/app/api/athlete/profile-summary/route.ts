@@ -51,16 +51,50 @@ export async function GET() {
     const latestImport = latestImportResult.data
     const ed = latestImport?.extracted_data
 
-    const nutrition = ed?.nutrition ? {
-      caloriesTarget: ed.nutrition.calories_target ?? null,
-      proteinG: ed.nutrition.protein_g ?? null,
-      carbsG: ed.nutrition.carbs_g ?? null,
-      fatG: ed.nutrition.fat_g ?? null,
-      mealsPerDay: ed.nutrition.meals_per_day ?? null,
-      nutritionNotes: ed.nutrition.notes ?? null
+    // Support both old schema (ed.nutrition) and new split schema
+    const rawNut = ed?.nutrition_training_day ?? ed?.nutrition ?? null
+    const rawNutRest = ed?.nutrition_rest_day ?? null
+
+    const nutrition = rawNut ? {
+      caloriesTarget: rawNut.calories ?? rawNut.calories_target ?? null,
+      proteinG: rawNut.protein_g ?? null,
+      carbsG: rawNut.carbs_g ?? null,
+      fatG: rawNut.fat_g ?? null,
+      fiberG: rawNut.fiber_g ?? null,
+      waterMl: rawNut.water_ml ?? null,
+      mealsPerDay: rawNut.meals_per_day ?? null,
+      nutritionNotes: rawNut.notes ?? null
     } : {
       caloriesTarget: null, proteinG: null, carbsG: null,
-      fatG: null, mealsPerDay: null, nutritionNotes: null
+      fatG: null, fiberG: null, waterMl: null, mealsPerDay: null, nutritionNotes: null
+    }
+
+    const nutritionRestDay = rawNutRest ? {
+      caloriesTarget: rawNutRest.calories ?? rawNutRest.calories_target ?? null,
+      proteinG: rawNutRest.protein_g ?? null,
+      carbsG: rawNutRest.carbs_g ?? null,
+      fatG: rawNutRest.fat_g ?? null,
+      fiberG: rawNutRest.fiber_g ?? null,
+      waterMl: rawNutRest.water_ml ?? null,
+      mealsPerDay: rawNutRest.meals_per_day ?? null,
+      nutritionNotes: rawNutRest.notes ?? null
+    } : null
+
+    const supplements: any[] = ed?.supplements ?? []
+    const nutritionNotes: string | null = ed?.nutrition_notes ?? null
+
+    // Extra athlete metrics from extracted data
+    const edAthlete = ed?.athlete ?? {}
+    const athleteMetrics = {
+      bodyFatPct: edAthlete.body_fat_pct ?? null,
+      leanMassKg: edAthlete.lean_mass_kg ?? null,
+      competitionCategory: edAthlete.competition_category ?? null,
+      waistCm: edAthlete.waist_cm ?? null,
+      chestCm: edAthlete.chest_cm ?? null,
+      armCm: edAthlete.arm_cm ?? null,
+      thighCm: edAthlete.thigh_cm ?? null,
+      hipCm: edAthlete.hip_cm ?? null,
+      calfCm: edAthlete.calf_cm ?? null,
     }
 
     const splitDetected = ed?.training_program?.split_type ?? null
@@ -80,6 +114,10 @@ export async function GET() {
         avatarUrl: profile.avatar_url
       },
       nutrition,
+      nutritionRestDay,
+      supplements,
+      nutritionNotes,
+      athleteMetrics,
       stats: {
         totalSessions: sessionsResult.count || 0,
         totalPRs: prResult.count || 0,

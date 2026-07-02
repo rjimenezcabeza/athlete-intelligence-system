@@ -1,86 +1,79 @@
 'use client'
+import { useEffect, useState } from 'react'
 
-import { useLastPerformance } from '@/hooks/useLastPerformance'
-
-const T: Record<string, Record<string, string>> = {
-  es: { last: 'Ultima sesion', first: 'Primera vez', pr: 'Record', load: 'Cargando...', sessions: 'sesiones' },
-  en: { last: 'Last session', first: 'First time', pr: 'PR', load: 'Loading...', sessions: 'sessions' },
-  fr: { last: 'Derniere session', first: 'Premiere fois', pr: 'Record', load: 'Chargement...', sessions: 'sessions' },
-  de: { last: 'Letzte Einheit', first: 'Erstes Mal', pr: 'Rekord', load: 'Laden...', sessions: 'Einheiten' },
-  it: { last: 'Ultima sessione', first: 'Prima volta', pr: 'Record', load: 'Caricamento...', sessions: 'sessioni' },
-  nl: { last: 'Laatste sessie', first: 'Eerste keer', pr: 'Record', load: 'Laden...', sessions: 'sessies' }
-}
+const T2 = 'var(--text-secondary,#888)'
+const T3 = 'var(--text-tertiary,#44445a)'
+const CARD = 'var(--card-bg,rgba(255,255,255,.04))'
+const BDR = 'var(--card-border,rgba(255,255,255,.08))'
 
 interface Props {
   exerciseId: string
-  weightUnit?: 'kg' | 'lbs'
-  locale?: string
+  locale: string
 }
 
-export function LastPerformanceBadge({ exerciseId, weightUnit = 'kg', locale = 'es' }: Props) {
-  const { lastPerformance, isLoading } = useLastPerformance(exerciseId)
-  const t = T[locale] || T.es
-  const fmt = (n: number) => weightUnit === 'lbs' ? `${Math.round(n * 2.2046)}lbs` : `${n}kg`
+interface PerformanceEntry {
+  date: string
+  maxWeight: number
+}
 
-  if (isLoading) {
-    return (
-      <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px', color: '#555', fontFamily: 'DM Mono, monospace' }}>
-        {t.load}
-      </div>
-    )
+export function LastPerformanceBadge({ exerciseId, locale }: Props) {
+  const [last, setLast] = useState<PerformanceEntry | null>(null)
+  const [prev, setPrev] = useState<PerformanceEntry | null>(null)
+  const isEs = locale === 'es'
+
+  useEffect(() => {
+    if (!exerciseId) return
+    fetch(`/api/progress/exercise?id=${exerciseId}`)
+      .then(r => r.json())
+      .then(({ data }) => {
+        if (!data?.length) return
+        setLast(data[data.length - 1])
+        if (data.length > 1) setPrev(data[data.length - 2])
+      })
+      .catch(() => {})
+  }, [exerciseId])
+
+  if (!last) return null
+
+  const diff = prev ? last.maxWeight - prev.maxWeight : null
+  const trend = diff === null ? null : diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat'
+
+  const fmt = (d: string) => {
+    const date = new Date(d)
+    return date.toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' })
   }
-
-  if (!lastPerformance) {
-    return (
-      <div style={{ padding: '8px 12px', background: 'rgba(200,255,0,0.06)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: '8px', fontSize: '12px', color: '#C8FF00', fontFamily: 'DM Mono, monospace' }}>
-        {t.first}
-      </div>
-    )
-  }
-
-  const { sets, history, sessionDate } = lastPerformance
-  const trend = history?.weightTrend
-  const trendEl = trend !== null && trend !== undefined
-    ? { icon: trend > 0.5 ? '↑' : trend < -0.5 ? '↓' : '→', color: trend > 0.5 ? '#C8FF00' : trend < -0.5 ? '#FF6B6B' : '#666' }
-    : null
 
   return (
-    <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '11px', color: '#555', fontFamily: 'DM Mono, monospace' }}>
-          {t.last} {new Date(sessionDate + 'T12:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '8px 12px', marginBottom: 10,
+      background: CARD, border: `1px solid ${BDR}`,
+      borderRadius: 10,
+    }}>
+      <span style={{ fontSize: 14 }}>📊</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 11, color: T3, fontFamily: 'DM Mono,monospace' }}>
+          {isEs ? 'Última vez' : 'Last time'} · {fmt(last.date)}
         </span>
-        {trendEl && (
-          <span style={{ fontSize: '13px', color: trendEl.color, fontFamily: 'DM Mono, monospace', fontWeight: 'bold' }}>
-            {trendEl.icon}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: T2, fontFamily: 'DM Mono,monospace' }}>
+            {last.maxWeight} kg
           </span>
-        )}
-      </div>
-      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-        {sets.slice(0, 6).map((s, i) => (
-          <div key={i} style={{
-            padding: '4px 8px',
-            background: s.isPR ? 'rgba(255,193,7,0.15)' : 'rgba(200,255,0,0.08)',
-            border: s.isPR ? '1px solid rgba(255,193,7,0.3)' : '1px solid rgba(200,255,0,0.1)',
-            borderRadius: '6px',
-            fontSize: '12px',
-            fontFamily: 'DM Mono, monospace',
-            color: s.isPR ? '#FFC107' : '#C8FF00',
-            whiteSpace: 'nowrap'
-          }}>
-            {fmt(s.weightKg)} x {s.repsCompleted}
-            {s.rirActual != null && <span style={{ color: '#666', fontSize: '10px' }}> @{s.rirActual}</span>}
-            {s.isPR && <span style={{ fontSize: '10px', marginLeft: '3px' }}>PR</span>}
-          </div>
-        ))}
-      </div>
-      {history && (history.bestWeightKg || history.totalSessions > 0) && (
-        <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: '#555', fontFamily: 'DM Mono, monospace', flexWrap: 'wrap' }}>
-          {history.bestWeightKg && <span>{t.pr}: <span style={{ color: '#FFC107' }}>{fmt(history.bestWeightKg)}</span></span>}
-          {history.totalSessions > 0 && <span>{history.totalSessions} {t.sessions}</span>}
-          {history.best1rmEstimated && <span>1RM: <span style={{ color: '#C8FF00' }}>{fmt(Math.round(history.best1rmEstimated))}</span></span>}
+          {trend === 'up' && diff !== null && (
+            <span style={{ fontSize: 10, color: '#4ADE80', fontFamily: 'DM Mono,monospace' }}>
+              ↑ +{diff.toFixed(1)}kg
+            </span>
+          )}
+          {trend === 'down' && diff !== null && (
+            <span style={{ fontSize: 10, color: '#FF6B6B', fontFamily: 'DM Mono,monospace' }}>
+              ↓ {diff.toFixed(1)}kg
+            </span>
+          )}
+          {trend === 'flat' && (
+            <span style={{ fontSize: 10, color: T3, fontFamily: 'DM Mono,monospace' }}>= sin cambio</span>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

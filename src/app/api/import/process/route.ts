@@ -15,10 +15,18 @@ function adminStorage() {
 
 export const maxDuration = 60
 
-const EXTRACTION_SYSTEM_PROMPT = `Eres un experto en analisis de programas de entrenamiento para hipertrofia.
-Tu tarea es extraer datos estructurados de documentos de entrenamiento y nutricion.
+const EXTRACTION_SYSTEM_PROMPT = `Eres un experto en analisis de programas de entrenamiento para hipertrofia, nutricion deportiva y suplementacion.
+Tu tarea es extraer TODOS los datos estructurados de documentos de entrenamiento, nutricion y suplementacion.
 
-SIEMPRE devuelves un JSON valido con esta estructura exacta (null para campos no encontrados):
+INSTRUCCIONES CRITICAS:
+- Revisa ABSOLUTAMENTE TODAS las hojas, columnas, filas y celdas del documento
+- Para Excel/CSV: lee CADA hoja por separado. Los ejercicios pueden estar en columnas diferentes (col A=ejercicio, col B=series, col C=reps, etc.)
+- Para nutricion: busca datos de DIA DE ENTRENAMIENTO y DIA DE DESCANSO por separado
+- Para suplementos: busca CUALQUIER mencion de proteina en polvo, creatina, cafeina, vitaminas, omega3, beta-alanina, colageno, pre-workout, aminoacidos, BCAA, glutamina, ZMA, magnesio, zinc, pre/intra/post entreno
+- Para metricas: extrae CUALQUIER dato corporal (peso, altura, grasa corporal, perimetros, etc.)
+- NUNCA dejes arrays vacios si hay datos disponibles en el documento
+
+SIEMPRE devuelves SOLO un JSON valido con esta estructura exacta (null para campos no encontrados):
 
 {
   "athlete": {
@@ -28,25 +36,49 @@ SIEMPRE devuelves un JSON valido con esta estructura exacta (null para campos no
     "age": null,
     "gender": null,
     "training_experience_years": null,
-    "primary_goal": null
+    "primary_goal": null,
+    "body_fat_pct": null,
+    "lean_mass_kg": null,
+    "competition_category": null,
+    "waist_cm": null,
+    "chest_cm": null,
+    "arm_cm": null,
+    "thigh_cm": null,
+    "hip_cm": null,
+    "calf_cm": null
   },
-  "nutrition": {
-    "calories_target": null,
+  "nutrition_training_day": {
+    "calories": null,
     "protein_g": null,
     "carbs_g": null,
     "fat_g": null,
+    "fiber_g": null,
+    "water_ml": null,
     "meals_per_day": null,
     "notes": null
   },
+  "nutrition_rest_day": {
+    "calories": null,
+    "protein_g": null,
+    "carbs_g": null,
+    "fat_g": null,
+    "fiber_g": null,
+    "water_ml": null,
+    "meals_per_day": null,
+    "notes": null
+  },
+  "nutrition_notes": null,
   "training_program": {
     "name": null,
     "split_type": null,
     "days_per_week": null,
     "mesocycle_weeks": null,
+    "progression_notes": null,
     "days": [
       {
         "day_number": 1,
         "day_label": "Push",
+        "muscle_focus": "Pecho, Hombros, Triceps",
         "exercises": [
           {
             "name": "Press Banca",
@@ -55,6 +87,8 @@ SIEMPRE devuelves un JSON valido con esta estructura exacta (null para campos no
             "rep_range_max": 12,
             "rir_target": 2,
             "rest_seconds": 120,
+            "weight_kg": null,
+            "tempo": null,
             "notes": null
           }
         ]
@@ -83,22 +117,34 @@ SIEMPRE devuelves un JSON valido con esta estructura exacta (null para campos no
   ],
   "supplements": [
     {
-      "name": "Creatina",
+      "name": "Creatina Monohidrato",
       "dose": "5g",
       "timing": "Post-entreno",
-      "purpose": "Fuerza / volumen"
+      "frequency": "Diario",
+      "purpose": "Fuerza y volumen muscular",
+      "form": "Polvo"
     }
   ],
+  "additional_notes": null,
   "confidence": 0.85,
   "notes": null
 }
 
-Si es texto de Excel/CSV, analiza todas las columnas y filas para encontrar datos de entrenamiento.
-Normaliza pesos: si estan en lbs, convierte a kg (divide entre 2.2046).
-Para split_type usa: PPL, Upper/Lower, Torso/Pierna, Full Body, Bro Split, Arnold Split.
-primary_goal acepta: hypertrophy, strength, weight_loss, endurance.
-confidence va de 0 a 1 segun tu certeza de extraccion.
-NUNCA devuelvas texto extra, solo el JSON.`
+REGLAS DE EXTRACCION PARA EXCEL/CSV:
+- Lee cada hoja/pestana del Excel por separado con su nombre
+- Si hay columnas tipo: Ejercicio|Series|Reps|Descanso|RIR es un programa de entrenamiento
+- Si hay filas con nombres de ejercicios seguidos de numeros extraelos como exercises
+- Dia entrenamiento vs descanso: busca "entrenamiento", "training", "descanso", "rest", "off", "dia libre"
+- Suplementos: busca en TODAS las hojas, pueden estar en hoja separada "suplementacion" o "stack"
+- Si ves "Semana X calorías Y" es una progresion nutricional, ponlo en nutrition_notes
+
+NORMALIZACION:
+- Pesos en lbs dividir entre 2.2046 para kg
+- split_type: PPL, Upper/Lower, Torso/Pierna, Full Body, Bro Split, Arnold Split
+- primary_goal: hypertrophy, strength, weight_loss, endurance, powerbuilding
+- confidence: 0-1 segun certeza total
+
+NUNCA devuelvas texto extra, markdown, backticks ni comentarios. SOLO el JSON puro.`
 
 async function excelToText(buffer: ArrayBuffer): Promise<string> {
   const XLSX = await import('xlsx')

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     let query = (admin as any)
       .from('exercises')
       .select('id, name, muscle_group_primary, equipment, slug')
-      .eq('is_global', true)
+      .or(`is_global.eq.true,created_by.eq.${user.id}`)
       .order('name')
 
     if (q.length > 0) {

@@ -44,6 +44,11 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const isEs = locale === 'es'
 
+  // AI Companion
+  const [aiMessage, setAiMessage] = useState<string|null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const aiDismissTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
+
   // Rest timer
   const [restActive, setRestActive] = useState(false)
   const [restRemaining, setRestRemaining] = useState(0)
@@ -109,16 +114,48 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   }, [])
 
   useEffect(() => { return () => { if (restRef.current) clearInterval(restRef.current) } }, [])
+  useEffect(() => { return () => { if (aiDismissTimer.current) clearTimeout(aiDismissTimer.current) } }, [])
 
-  // Auto-trigger rest when a new set is logged
+  // AI Companion — react to each set logged
+  const getAiReaction = useCallback(async (setsCount: number, exerciseName: string, lastSet: any) => {
+    if (!lastSet) return
+    setAiLoading(true)
+    setAiMessage(null)
+    try {
+      const prompt = isEs
+        ? `En 1 frase corta y motivadora, reacciona a esta serie: ${exerciseName} - ${lastSet.weight_kg}kg × ${lastSet.reps_completed} reps${lastSet.rir_actual!=null?`, RIR ${lastSet.rir_actual}`:''} (serie ${setsCount} del entreno). Sé directo, específico y energético. Sin emojis al inicio.`
+        : `In 1 short motivating sentence, react to this set: ${exerciseName} - ${lastSet.weight_kg}kg × ${lastSet.reps_completed} reps${lastSet.rir_actual!=null?`, RIR ${lastSet.rir_actual}`:''} (set ${setsCount} of workout). Be direct, specific and energetic. No emojis at start.`
+      const res = await fetch('/api/ai/coach', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      })
+      const data = await res.json()
+      const msg = data.content ?? data.message ?? data.text ?? null
+      if (msg) {
+        setAiMessage(msg.trim())
+        if (aiDismissTimer.current) clearTimeout(aiDismissTimer.current)
+        aiDismissTimer.current = setTimeout(() => setAiMessage(null), 8000)
+      }
+    } catch {}
+    setAiLoading(false)
+  }, [isEs])
+
+  // Auto-trigger rest + AI reaction when a new set is logged
   const prevSetsCount = useRef(0)
   const totalSets = exercises.reduce((a, e) => a + e.sets.length, 0)
   useEffect(() => {
-    if (totalSets > prevSetsCount.current && prevSetsCount.current > 0) {
-      startRest(restTotal)
+    if (totalSets > prevSetsCount.current) {
+      if (prevSetsCount.current > 0) startRest(restTotal)
+      // Get last logged set for AI reaction
+      const allSets = exercises.flatMap(e => e.sets)
+      const lastSet = allSets[allSets.length - 1]
+      const lastEx = [...exercises].reverse().find(e => e.sets.length > 0)
+      if (lastSet && lastEx) {
+        getAiReaction(totalSets, lastEx.name, lastSet)
+      }
     }
     prevSetsCount.current = totalSets
-  }, [totalSets, startRest, restTotal])
+  }, [totalSets, startRest, restTotal, getAiReaction])
 
   const fmt = (s: number) => {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = s % 60
@@ -229,6 +266,40 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
             color: T2, fontSize: 11, fontWeight: 700,
             fontFamily: 'Syne, sans-serif', cursor: 'pointer',
           }}>{isEs ? 'Saltar' : 'Skip'}</button>
+        </div>
+      )}
+
+      {/* ── AI Companion banner ── */}
+      {(aiLoading || aiMessage) && (
+        <div style={{
+          background: 'rgba(167,139,250,0.07)',
+          borderBottom: '1px solid rgba(167,139,250,0.18)',
+          padding: '10px 20px',
+          display: 'flex', alignItems: 'center', gap: 10, minHeight: 46,
+        }}>
+          <span style={{ fontSize: 18, flexShrink: 0 }}>🤖</span>
+          {aiLoading ? (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              {[0,1,2].map(i => (
+                <div key={i} style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: '#A78BFA', opacity: 0.5,
+                  animation: `bounce 1.2s ease-in-out ${i*0.2}s infinite`,
+                }}/>
+              ))}
+              <style>{`@keyframes bounce{0%,80%,100%{transform:scale(0.8)}40%{transform:scale(1.2)}}`}</style>
+            </div>
+          ) : (
+            <p style={{ margin: 0, fontSize: 12, color: '#C4B5FD', fontFamily: 'Inter, sans-serif', lineHeight: 1.4, flex: 1 }}>
+              {aiMessage}
+            </p>
+          )}
+          {aiMessage && (
+            <button onClick={() => setAiMessage(null)} style={{
+              background: 'none', border: 'none', color: '#44445a',
+              cursor: 'pointer', fontSize: 14, padding: 0, flexShrink: 0
+            }}>✕</button>
+          )}
         </div>
       )}
 

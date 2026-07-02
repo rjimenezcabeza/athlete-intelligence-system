@@ -1,145 +1,87 @@
 'use client'
+import { useEffect, useState } from 'react'
 
-import { useState, useEffect } from 'react'
-
-interface Suggestion {
-  id: string
-  action_type: string
-  prev_weight_kg: number | null
-  new_weight_kg: number | null
-  new_reps_target: number | null
-  reasoning_es: string
-  reasoning_en: string
-  applied: boolean
-  exercises: { name: string; muscle_group_primary: string } | null
-}
-
-const ACTION_ICONS: Record<string, string> = {
-  increase_weight: '↑',
-  increase_reps: '+',
-  maintain_weight: '→',
-}
-
-const ACTION_COLORS: Record<string, string> = {
-  increase_weight: '#C8FF00',
-  increase_reps: '#4CAF50',
-  maintain_weight: '#888888',
-}
+const T1 = 'var(--text-primary,#fff)'
+const T2 = 'var(--text-secondary,#888)'
+const T3 = 'var(--text-tertiary,#44445a)'
+const CARD = 'var(--card-bg,rgba(255,255,255,.04))'
+const BDR = 'var(--card-border,rgba(255,255,255,.08))'
+const ACC = 'var(--accent-color,#C8FF00)'
 
 interface Props {
   sessionId: string
-  locale?: string
-  weightUnit?: 'kg' | 'lbs'
-  onDismiss?: () => void
+  locale: string
 }
 
-export function ProgressionSuggestionsPanel({ sessionId, locale = 'es', weightUnit = 'kg', onDismiss }: Props) {
+interface Suggestion {
+  id: string
+  recommendation_type: string
+  recommendation_text: string
+  reasoning: string | null
+}
+
+export function ProgressionSuggestionsPanel({ sessionId, locale }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [loading, setLoading] = useState(true)
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
-
-  const fmt = (n: number | null) => {
-    if (!n) return '-'
-    return weightUnit === 'lbs' ? `${Math.round(n * 2.2046)}lbs` : `${n}kg`
-  }
+  const isEs = locale === 'es'
 
   useEffect(() => {
-    fetch(`/api/progression/session-summary?sessionId=${sessionId}`)
+    if (!sessionId) return
+    fetch(`/api/ai/suggestions?sessionId=${sessionId}`, { method: 'POST' })
       .then(r => r.json())
-      .then(d => setSuggestions(d.suggestions || []))
+      .then(data => {
+        if (Array.isArray(data.suggestions)) setSuggestions(data.suggestions)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [sessionId])
 
-  const handleApply = async (id: string, applied: boolean) => {
-    await fetch('/api/progression/session-summary', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ suggestionId: id, applied })
-    })
-    setSuggestions(prev => prev.map(s => s.id === id ? { ...s, applied } : s))
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <div style={{ fontSize: 24, marginBottom: 8 }}>🤖</div>
+        <p style={{ margin: 0, fontSize: 12, color: T3, fontFamily: 'DM Mono,monospace' }}>
+          {isEs ? 'Analizando tu sesión...' : 'Analyzing your session...'}
+        </p>
+      </div>
+    )
   }
 
-  const handleDismiss = (id: string) => {
-    setDismissed(prev => new Set([...prev, id]))
+  if (!suggestions.length) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', background: CARD, border: `1px solid ${BDR}`, borderRadius: 14 }}>
+        <div style={{ fontSize: 24, marginBottom: 8 }}>✅</div>
+        <p style={{ margin: 0, fontSize: 13, color: T2, fontFamily: 'Syne,sans-serif', fontWeight: 700 }}>
+          {isEs ? '¡Buen entrenamiento!' : 'Great workout!'}
+        </p>
+        <p style={{ margin: '4px 0 0', fontSize: 11, color: T3, fontFamily: 'DM Mono,monospace' }}>
+          {isEs ? 'Sin cambios necesarios por ahora.' : 'No changes needed for now.'}
+        </p>
+      </div>
+    )
   }
-
-  const visible = suggestions.filter(s => !dismissed.has(s.id))
-
-  if (loading || visible.length === 0) return null
-
-  const title = locale === 'es' ? 'Sugerencias para la proxima sesion' : 'Suggestions for next session'
-  const applyLabel = locale === 'es' ? 'Aplicar' : 'Apply'
-  const skipLabel = locale === 'es' ? 'Omitir' : 'Skip'
 
   return (
-    <div style={{ padding: '20px', background: 'rgba(200,255,0,0.04)', border: '1px solid rgba(200,255,0,0.15)', borderRadius: '16px', marginTop: '16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-        <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#C8FF00', fontFamily: 'Syne, sans-serif' }}>
-          {title}
-        </h3>
-        <span style={{ fontSize: '11px', color: '#555', fontFamily: 'DM Mono, monospace' }}>
-          {visible.length} {locale === 'es' ? 'ejercicios' : 'exercises'}
-        </span>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {visible.map(s => {
-          const color = ACTION_COLORS[s.action_type] || '#888'
-          const icon = ACTION_ICONS[s.action_type] || ''
-          const reasoning = locale === 'es' ? s.reasoning_es : s.reasoning_en
-
-          return (
-            <div key={s.id} style={{
-              padding: '12px 14px',
-              background: s.applied ? 'rgba(200,255,0,0.08)' : 'rgba(255,255,255,0.03)',
-              border: `1px solid ${s.applied ? 'rgba(200,255,0,0.2)' : 'rgba(255,255,255,0.07)'}`,
-              borderRadius: '10px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '13px', color, fontFamily: 'DM Mono, monospace', fontWeight: 'bold' }}>{icon}</span>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#ddd', fontFamily: 'DM Mono, monospace' }}>
-                      {s.exercises?.name || 'Ejercicio'}
-                    </span>
-                    {s.new_weight_kg && s.prev_weight_kg && s.new_weight_kg !== s.prev_weight_kg && (
-                      <span style={{ fontSize: '12px', color, fontFamily: 'DM Mono, monospace' }}>
-                        {fmt(s.prev_weight_kg)} → {fmt(s.new_weight_kg)}
-                      </span>
-                    )}
-                  </div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#888', lineHeight: '1.4', fontFamily: 'Inter, sans-serif' }}>
-                    {reasoning}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                  {!s.applied ? (
-                    <>
-                      <button
-                        onClick={() => handleApply(s.id, true)}
-                        style={{ padding: '6px 10px', background: 'rgba(200,255,0,0.15)', border: '1px solid rgba(200,255,0,0.3)', borderRadius: '6px', color: '#C8FF00', fontSize: '11px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' }}
-                      >
-                        {applyLabel}
-                      </button>
-                      <button
-                        onClick={() => handleDismiss(s.id)}
-                        style={{ padding: '6px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#666', fontSize: '11px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' }}
-                      >
-                        {skipLabel}
-                      </button>
-                    </>
-                  ) : (
-                    <span style={{ fontSize: '11px', color: '#C8FF00', fontFamily: 'DM Mono, monospace', padding: '6px 0' }}>
-                      {locale === 'es' ? 'Anotado' : 'Noted'} ✓
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <p style={{ margin: '0 0 4px', fontSize: 11, color: T3, fontFamily: 'DM Mono,monospace', textTransform: 'uppercase', letterSpacing: '.1em' }}>
+        {isEs ? 'Sugerencias IA' : 'AI Suggestions'}
+      </p>
+      {suggestions.map(s => (
+        <div key={s.id} style={{
+          padding: '14px 16px', background: CARD,
+          border: `1px solid ${BDR}`, borderRadius: 14,
+          borderLeft: `3px solid ${ACC}`,
+        }}>
+          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: T1, fontFamily: 'Syne,sans-serif' }}>
+            {s.recommendation_text}
+          </p>
+          {s.reasoning && (
+            <p style={{ margin: 0, fontSize: 11, color: T3, fontFamily: 'DM Mono,monospace', lineHeight: 1.5 }}>
+              {s.reasoning}
+            </p>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

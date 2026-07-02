@@ -11,10 +11,13 @@ interface SetLoggerProps {
 }
 
 const TYPES = [
-  { key: 'working',  label: 'Working',  color: '#C8FF00' },
-  { key: 'warmup',   label: 'Warm-up',  color: '#FBBF24' },
-  { key: 'top_set',  label: 'Top Set',  color: '#A78BFA' },
-  { key: 'backoff',  label: 'Back-off', color: '#60A5FA' },
+  { key: 'working',    label: 'Working',    color: '#C8FF00', desc: 'Serie de trabajo' },
+  { key: 'warmup',     label: 'Warm-up',    color: '#FBBF24', desc: 'Calentamiento' },
+  { key: 'top_set',    label: 'Top Set',    color: '#A78BFA', desc: 'Serie tope' },
+  { key: 'backoff',    label: 'Back-off',   color: '#60A5FA', desc: 'Descarga' },
+  { key: 'drop_set',   label: 'Drop Set',   color: '#FF6B6B', desc: '-15-20% peso, sin descanso' },
+  { key: 'rest_pause', label: 'Rest Pause', color: '#F97316', desc: '10-15s pausa, más reps' },
+  { key: 'myo_reps',   label: 'Myo Reps',  color: '#EC4899', desc: '3-5 mini-series de activación' },
 ]
 
 export function SetLogger({ sessionId, sessionExerciseId, exerciseIndex, setNumber, lastSet }: SetLoggerProps) {
@@ -66,22 +69,32 @@ export function SetLogger({ sessionId, sessionExerciseId, exerciseIndex, setNumb
     setSaving(false)
   }
 
+  const activeType = TYPES.find(t => t.key === type)
+
   return (
     <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, padding: 20, marginBottom: 12 }}>
-      {/* Type selector */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        {TYPES.map(t => (
-          <button key={t.key} onClick={() => setType(t.key)} style={{
-            flex: 1, padding: '7px 4px', borderRadius: 9,
-            fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif',
-            cursor: 'pointer', letterSpacing: '0.05em',
-            background: type === t.key ? t.color + '22' : 'transparent',
-            color: type === t.key ? t.color : '#44445a',
-            border: '1px solid ' + (type === t.key ? t.color + '44' : '#1a1a2e'),
-            transition: 'all 0.15s'
-          }}>{t.label}</button>
-        ))}
+      {/* Type selector — scrollable row */}
+      <div style={{ overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 6 }}>
+        <div style={{ display: 'flex', gap: 6, width: 'max-content', paddingBottom: 2 }}>
+          {TYPES.map(t => (
+            <button key={t.key} onClick={() => setType(t.key)} style={{
+              padding: '6px 10px', borderRadius: 9, whiteSpace: 'nowrap',
+              fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif',
+              cursor: 'pointer', letterSpacing: '0.05em',
+              background: type === t.key ? t.color + '22' : 'transparent',
+              color: type === t.key ? t.color : '#44445a',
+              border: '1px solid ' + (type === t.key ? t.color + '44' : '#1a1a2e'),
+              transition: 'all 0.15s'
+            }}>{t.label}</button>
+          ))}
+        </div>
       </div>
+      {/* Type description */}
+      {activeType?.desc && (
+        <p style={{ margin: '0 0 14px', fontSize: 10, color: activeType.color + '99', fontFamily: 'DM Mono, monospace', letterSpacing: '0.04em' }}>
+          ↳ {activeType.desc}
+        </p>
+      )}
 
       {/* Inputs */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
@@ -112,7 +125,10 @@ export function SetLogger({ sessionId, sessionExerciseId, exerciseIndex, setNumb
 export function CompletedSet({ set, exerciseIndex, setIndex, sessionId }: { set: any; exerciseIndex: number; setIndex: number; sessionId: string }) {
   const { removeSet } = useSessionStore()
   const [del, setDel] = useState(false)
-  const typeColors: Record<string, string> = { working: '#C8FF00', warmup: '#FBBF24', top_set: '#A78BFA', backoff: '#60A5FA' }
+  const typeColors: Record<string, string> = {
+    working: '#C8FF00', warmup: '#FBBF24', top_set: '#A78BFA', backoff: '#60A5FA',
+    drop_set: '#FF6B6B', rest_pause: '#F97316', myo_reps: '#EC4899'
+  }
   const col = typeColors[set.set_type] ?? '#C8FF00'
 
   const handleDel = async () => {
