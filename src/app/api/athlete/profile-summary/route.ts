@@ -22,7 +22,7 @@ export async function GET() {
 
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-    const [sessionsResult, latestImportResult, lastSessionResult, prResult] = await Promise.all([
+    const [sessionsResult, latestImportResult, lastSessionResult, prResult, recentSessionsResult] = await Promise.all([
       (supabase as any)
         .from('training_sessions')
         .select('id', { count: 'exact', head: true })
@@ -45,8 +45,34 @@ export async function GET() {
       (supabase as any)
         .from('sets')
         .select('id', { count: 'exact', head: true })
-        .eq('is_personal_record', true)
+        .eq('is_personal_record', true),
+      // Last 16 weeks of sessions for streak calc
+      (supabase as any)
+        .from('training_sessions')
+        .select('session_date')
+        .eq('athlete_id', profile.id)
+        .gte('session_date', new Date(Date.now() - 16 * 7 * 86400 * 1000).toISOString().split('T')[0])
+        .order('session_date', { ascending: false })
     ])
+
+    // Compute weekly streak
+    const getWeekKey = (dateStr: string) => {
+      const d = new Date(dateStr + 'T12:00:00Z')
+      const mon = new Date(d)
+      mon.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
+      return mon.toISOString().split('T')[0]
+    }
+    const sessionWeeks = new Set((recentSessionsResult.data ?? []).map((s: any) => getWeekKey(s.session_date)))
+    let currentStreak = 0
+    const today = new Date()
+    const mon = new Date(today)
+    mon.setUTCDate(today.getUTCDate() - ((today.getUTCDay() + 6) % 7))
+    while (true) {
+      const wk = mon.toISOString().split('T')[0]
+      if (!sessionWeeks.has(wk)) break
+      currentStreak++
+      mon.setUTCDate(mon.getUTCDate() - 7)
+    }
 
     const latestImport = latestImportResult.data
     const ed = latestImport?.extracted_data
@@ -121,6 +147,7 @@ export async function GET() {
       stats: {
         totalSessions: sessionsResult.count || 0,
         totalPRs: prResult.count || 0,
+        currentStreak,
         activeMesocycle: null,
         lastSessionDate: lastSessionResult.data?.session_date || null
       },

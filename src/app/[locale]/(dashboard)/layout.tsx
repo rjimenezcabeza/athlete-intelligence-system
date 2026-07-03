@@ -31,24 +31,21 @@ export default async function DashboardLayout({
 
   let accentColor = '#C8FF00'
   let paletteId = 'default'
+  let customBgColor: string | null = null
   try {
     const { data: prof } = await (supabase as any)
       .from('athlete_profiles')
-      .select('accent_color, color_palette')
+      .select('accent_color, color_palette, custom_bg_color')
       .eq('user_id', user.id)
       .single()
     if (prof?.accent_color) accentColor = prof.accent_color
-    if (prof?.color_palette) paletteId = prof.color_palette
-  } catch {}
-
-  let customBgColor: string | null = null
-  try {
-    const { data: prof2 } = await (supabase as any)
-      .from('athlete_profiles')
-      .select('custom_bg_color')
-      .eq('user_id', user.id)
-      .single()
-    if (prof2?.custom_bg_color) customBgColor = prof2.custom_bg_color
+    if (prof?.color_palette) {
+      // color_palette is JSONB — could be a string id or a full object (legacy)
+      paletteId = typeof prof.color_palette === 'string'
+        ? prof.color_palette
+        : (prof.color_palette?.id ?? 'default')
+    }
+    if (prof?.custom_bg_color) customBgColor = prof.custom_bg_color
   } catch {}
 
   const palette = getPaletteById(paletteId)

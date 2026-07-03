@@ -11,6 +11,7 @@ interface SessionRow {
   id: string; session_date: string; duration_minutes: number | null
   pump_rating: number | null; local_fatigue: number | null
   perceived_recovery: number | null; status: string; day_label: string | null
+  volume_kg?: number
 }
 
 type FilterPeriod = 'week' | 'month' | 'year'
@@ -26,6 +27,41 @@ function buildWeeklyChart(sessions: SessionRow[]) {
     weeks[key] = (weeks[key] ?? 0) + 1
   })
   return Object.entries(weeks).map(([week, count]) => ({ week, count })).slice(-8)
+}
+
+function buildVolumeChart(sessions: SessionRow[]) {
+  const weeks: Record<string, number> = {}
+  sessions.forEach(s => {
+    if (!s.volume_kg) return
+    const d = new Date(s.session_date)
+    const monday = new Date(d)
+    monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    const key = monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    weeks[key] = (weeks[key] ?? 0) + s.volume_kg
+  })
+  return Object.entries(weeks).map(([week, kg]) => ({ week, kg: Math.round(kg / 100) / 10 })).slice(-8)
+}
+
+function computeWeeklyStreak(sessions: SessionRow[]): number {
+  if (sessions.length === 0) return 0
+  const getWeekKey = (dateStr: string) => {
+    const d = new Date(dateStr + 'T12:00:00Z')
+    const mon = new Date(d)
+    mon.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    return mon.toISOString().split('T')[0]
+  }
+  const sessionWeeks = new Set(sessions.map(s => getWeekKey(s.session_date)))
+  let streak = 0
+  const today = new Date()
+  const mon = new Date(today)
+  mon.setUTCDate(today.getUTCDate() - ((today.getUTCDay() + 6) % 7))
+  while (true) {
+    const wk = mon.toISOString().split('T')[0]
+    if (!sessionWeeks.has(wk)) break
+    streak++
+    mon.setUTCDate(mon.getUTCDate() - 7)
+  }
+  return streak
 }
 
 function Skel({ w = '100%', h = 24 }: { w?: string | number; h?: number }) {
@@ -74,7 +110,12 @@ export default function HistoryPage() {
   }
   const filtered = sessions.filter(s => new Date(s.session_date) >= cutoffs[filter])
   const totalDuration = filtered.reduce((a, s) => a + (s.duration_minutes ?? 0), 0)
+  const totalVolume = filtered.reduce((a, s) => a + (s.volume_kg ?? 0), 0)
+  const avgDuration = filtered.length > 0 ? Math.round(totalDuration / filtered.filter(s => s.duration_minutes).length) : 0
+  const weeklyStreak = computeWeeklyStreak(sessions)
   const chartData = buildWeeklyChart(sessions)
+  const volumeChartData = buildVolumeChart(sessions)
+  const hasVolumeData = volumeChartData.some(d => d.kg > 0)
 
   const filterLabels: Record<FilterPeriod, { es: string; en: string }> = {
     week:  { es: '7 días',  en: '7 days'  },
@@ -156,44 +197,72 @@ export default function HistoryPage() {
 
         {/* KPI STRIP */}
         {loading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, ...animStyle(80) }}>
-            {[1,2,3].map(i => <Skel key={i} h={72} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...animStyle(80) }}>
+            {[1,2,3,4].map(i => <Skel key={i} h={76} />)}
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, ...animStyle(80) }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, ...animStyle(80) }}>
             {[
-              { label: isEs ? 'Sesiones' : 'Sessions', value: String(filtered.length), color: T1 },
-              { label: isEs ? 'Tiempo total' : 'Total time', value: totalDuration > 0 ? Math.round(totalDuration / 60) + 'h' : '—', color: T1 },
-              { label: isEs ? 'Este mes' : 'This period', value: filtered.filter(s => { const d = new Date(s.session_date); const m = new Date(); return d.getMonth() === m.getMonth(); }).length + '', color: ACC },
+              { label: isEs ? 'Sesiones' : 'Sessions', value: String(filtered.length), sub: isEs ? 'en el período' : 'in period', color: T1 },
+              { label: isEs ? 'Tiempo total' : 'Total time', value: totalDuration > 0 ? Math.round(totalDuration / 60) + 'h' : '—', sub: avgDuration > 0 ? `~${avgDuration}min / ${isEs ? 'sesión' : 'session'}` : '—', color: T1 },
+              { label: isEs ? 'Racha' : 'Streak', value: weeklyStreak > 0 ? weeklyStreak + (isEs ? ' sem' : ' wk') : '—', sub: isEs ? 'semanas activo' : 'active weeks', color: weeklyStreak >= 4 ? ACC : T1 },
+              { label: isEs ? 'Volumen' : 'Volume', value: totalVolume > 0 ? (totalVolume >= 1000 ? Math.round(totalVolume / 100) / 10 + 't' : totalVolume + 'kg') : '—', sub: isEs ? 'total período' : 'period total', color: T1 },
             ].map(k => (
-              <div key={k.label} style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 14, padding: '14px', textAlign: 'center' }}>
+              <div key={k.label} style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 14, padding: '14px 16px' }}>
                 <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 6 }}>{k.label}</p>
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 700, color: k.color }}>{k.value}</p>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 700, color: k.color, lineHeight: 1, marginBottom: 4 }}>{k.value}</p>
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 9, color: T3 }}>{k.sub}</p>
               </div>
             ))}
           </div>
         )}
 
-        {/* CHART */}
+        {/* CHARTS */}
         {!loading && chartData.length > 1 && (
-          <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '16px', ...animStyle(120) }}>
-            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 12 }}>
-              {isEs ? 'Sesiones por semana' : 'Sessions per week'}
-            </p>
-            <ResponsiveContainer width="100%" height={90}>
-              <BarChart data={chartData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }} barCategoryGap="35%">
-                <XAxis dataKey="week" tick={{ fill: T3, fontSize: 9 }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip
-                  cursor={{ fill: 'rgba(200,255,0,0.05)' }}
-                  contentStyle={{ background: '#16161f', border: '1px solid rgba(200,255,0,0.2)', borderRadius: 10, color: T1, fontSize: 12 }}
-                  formatter={(v: unknown) => [`${v}`, isEs ? 'Sesiones' : 'Sessions'] as [string, string]}
-                />
-                <Bar dataKey="count" radius={[5, 5, 0, 0]}>
-                  {chartData.map((_, i) => <Cell key={i} fill={i === chartData.length - 1 ? ACC : '#222230'} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, ...animStyle(120) }}>
+            {/* Sessions per week */}
+            <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '16px' }}>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 12 }}>
+                {isEs ? 'Sesiones por semana' : 'Sessions per week'}
+              </p>
+              <ResponsiveContainer width="100%" height={90}>
+                <BarChart data={chartData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }} barCategoryGap="35%">
+                  <XAxis dataKey="week" tick={{ fill: T3, fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <YAxis hide />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(200,255,0,0.05)' }}
+                    contentStyle={{ background: '#16161f', border: '1px solid rgba(200,255,0,0.2)', borderRadius: 10, color: T1, fontSize: 12 }}
+                    formatter={(v: unknown) => [`${v}`, isEs ? 'Sesiones' : 'Sessions'] as [string, string]}
+                  />
+                  <Bar dataKey="count" radius={[5, 5, 0, 0]}>
+                    {chartData.map((_, i) => <Cell key={i} fill={i === chartData.length - 1 ? ACC : '#222230'} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Volume per week */}
+            {hasVolumeData && (
+              <div style={{ background: CARD, border: '1px solid ' + BORDER, borderRadius: 18, padding: '16px' }}>
+                <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T3, marginBottom: 12 }}>
+                  {isEs ? 'Volumen por semana (t)' : 'Volume per week (t)'}
+                </p>
+                <ResponsiveContainer width="100%" height={90}>
+                  <BarChart data={volumeChartData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }} barCategoryGap="35%">
+                    <XAxis dataKey="week" tick={{ fill: T3, fontSize: 9 }} axisLine={false} tickLine={false} />
+                    <YAxis hide />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(0,212,255,0.05)' }}
+                      contentStyle={{ background: '#16161f', border: '1px solid rgba(0,212,255,0.2)', borderRadius: 10, color: T1, fontSize: 12 }}
+                      formatter={(v: unknown) => [`${v}t`, isEs ? 'Volumen' : 'Volume'] as [string, string]}
+                    />
+                    <Bar dataKey="kg" radius={[5, 5, 0, 0]}>
+                      {volumeChartData.map((_, i) => <Cell key={i} fill={i === volumeChartData.length - 1 ? '#00D4FF' : '#1a2230'} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         )}
 
@@ -217,9 +286,12 @@ export default function HistoryPage() {
                   <div style={{ fontSize: 10, color: T3, fontFamily: 'DM Mono, monospace', textTransform: 'capitalize' }}>
                     {date.toLocaleDateString(isEs ? 'es-ES' : 'en-US', { weekday: 'short', month: 'short' })}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 11, color: T2, fontFamily: 'DM Mono, monospace' }}>{s.duration_minutes ? `${s.duration_minutes}min` : '—'}</span>
-                    {s.pump_rating != null && <span style={{ fontSize: 11, color: ACC, fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>💪{s.pump_rating}</span>}
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {s.volume_kg ? <span style={{ fontSize: 10, color: '#00D4FF', fontFamily: 'DM Mono, monospace' }}>{s.volume_kg >= 1000 ? (Math.round(s.volume_kg/100)/10)+'t' : s.volume_kg+'kg'}</span> : null}
+                      {s.pump_rating != null && <span style={{ fontSize: 11, color: ACC, fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>💪{s.pump_rating}</span>}
+                    </div>
                   </div>
                 </button>
               )
@@ -366,6 +438,7 @@ export default function HistoryPage() {
                                   { label: isEs ? 'Fatiga' : 'Fatigue', value: s.local_fatigue ?? '—', color: '#FF6B6B' },
                                   { label: isEs ? 'Recuper.' : 'Recovery', value: s.perceived_recovery ?? '—', color: '#4ECDC4' },
                                   { label: isEs ? 'Duración' : 'Duration', value: s.duration_minutes ? `${s.duration_minutes}m` : '—', color: T1 },
+                                  { label: isEs ? 'Volumen' : 'Volume', value: s.volume_kg ? (s.volume_kg >= 1000 ? (Math.round(s.volume_kg / 100) / 10) + 't' : s.volume_kg + 'kg') : '—', color: '#00D4FF' },
                                 ].map(m => (
                                   <div key={m.label}>
                                     <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T3, marginBottom: 3 }}>{m.label}</p>

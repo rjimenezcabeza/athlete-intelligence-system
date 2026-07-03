@@ -381,11 +381,23 @@ export async function POST(request: Request) {
 
     // Create review items
     const reviewItems: any[] = []
-    if (extractedData.athlete || extractedData.nutrition) {
+    const hasNutritionData = !!(
+      extractedData.nutrition_training_day?.calories ||
+      extractedData.nutrition_training_day?.protein_g ||
+      extractedData.nutrition_rest_day?.calories
+    )
+    if (extractedData.athlete || hasNutritionData) {
       reviewItems.push({
         imported_file_id: importedFileId,
         item_type: 'template',
-        raw_extracted: { type: 'profile', athlete: extractedData.athlete, nutrition: extractedData.nutrition },
+        raw_extracted: {
+          type: 'profile',
+          athlete: extractedData.athlete,
+          nutrition_training_day: extractedData.nutrition_training_day,
+          nutrition_rest_day: extractedData.nutrition_rest_day,
+          supplements: extractedData.supplements,
+          nutrition_notes: extractedData.nutrition_notes,
+        },
         review_status: 'pending',
         confidence_score: extractedData.confidence || 0.8
       })
@@ -428,13 +440,14 @@ export async function POST(request: Request) {
       confidence: extractedData.confidence,
       sessionsFound: extractedData.training_sessions?.length || 0,
       hasProgram: processedDays.length > 0,
-      hasProfile: !!(extractedData.athlete || extractedData.nutrition),
-      hasNutrition: !!(extractedData.nutrition?.calories_target || extractedData.nutrition?.protein_g),
+      hasProfile: !!(extractedData.athlete || hasNutritionData),
+      hasNutrition: hasNutritionData,
       extracted: {
-        hasProfile: !!(extractedData.athlete || extractedData.nutrition),
+        hasProfile: !!(extractedData.athlete || hasNutritionData),
         hasProgram: processedDays.length > 0,
         hasSessions: !!(extractedData.training_sessions?.length),
-        hasNutrition: !!(extractedData.nutrition?.calories_target || extractedData.nutrition?.protein_g),
+        hasNutrition: hasNutritionData,
+        hasSupplements: !!(extractedData.supplements?.length),
         confidence: extractedData.confidence,
         summary: {
           athleteName: extractedData.athlete?.display_name,
@@ -443,8 +456,9 @@ export async function POST(request: Request) {
           sessionsCount: extractedData.training_sessions?.length || 0,
           exercisesInProgram: totalExercisesInProgram,
           mappedExercises,
-          calories: extractedData.nutrition?.calories_target,
-          protein: extractedData.nutrition?.protein_g
+          supplementsCount: extractedData.supplements?.length || 0,
+          calories: extractedData.nutrition_training_day?.calories,
+          protein: extractedData.nutrition_training_day?.protein_g
         }
       }
     })

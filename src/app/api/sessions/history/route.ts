@@ -24,11 +24,24 @@ export async function GET() {
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     const { data } = await (admin as any)
       .from('training_sessions')
-      .select('id, session_date, duration_minutes, pump_rating, local_fatigue, perceived_recovery, status, day_label')
+      .select(`
+        id, session_date, duration_minutes, pump_rating, local_fatigue, perceived_recovery, status, day_label,
+        session_exercises ( sets ( weight_kg, reps_completed ) )
+      `)
       .eq('athlete_id', profile.id)
       .order('session_date', { ascending: false })
       .limit(100)
-    return NextResponse.json({ sessions: data ?? [] })
+
+    // Compute volume per session and strip the nested structure
+    const sessions = (data ?? []).map((s: any) => {
+      const volume = (s.session_exercises ?? []).reduce((sum: number, se: any) =>
+        sum + (se.sets ?? []).reduce((sv: number, set: any) =>
+          sv + ((set.weight_kg ?? 0) * (set.reps_completed ?? 0)), 0), 0)
+      const { session_exercises: _, ...rest } = s
+      return { ...rest, volume_kg: Math.round(volume) }
+    })
+
+    return NextResponse.json({ sessions })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: msg }, { status: 500 })
