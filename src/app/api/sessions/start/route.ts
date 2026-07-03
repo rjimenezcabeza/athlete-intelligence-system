@@ -28,6 +28,18 @@ export async function POST(request: Request) {
     const { data: profile } = await (admin as any)
       .from('athlete_profiles').select('id').eq('user_id', user.id).single()
     if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+
+    // Return existing active session instead of creating duplicates
+    const { data: existing } = await (admin as any)
+      .from('training_sessions')
+      .select('id, session_date, status, started_at, athlete_id')
+      .eq('athlete_id', profile.id)
+      .eq('status', 'active')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (existing) return NextResponse.json({ session: existing })
+
     const body = await request.json().catch(() => ({}))
     const now = new Date().toISOString()
     const insertData: Record<string, unknown> = {

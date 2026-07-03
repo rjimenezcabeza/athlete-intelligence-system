@@ -110,10 +110,14 @@ export default function NewSessionPage() {
     : `${dayName}, ${monthName} ${now.getDate()}`
 
   useEffect(() => {
+    // Redirect to existing active session if one exists
+    fetch('/api/sessions/active').then(r => r.json()).then(d => {
+      if (d.session?.id) router.replace(`/${locale}/session/${d.session.id}`)
+    }).catch(() => {})
     fetch('/api/dashboard/summary').then(r => r.json()).then(d => {
       if (!d.error) setStats(d)
     }).catch(() => {})
-  }, [])
+  }, [locale, router])
 
   const startSession = async () => {
     setLoading(true); setError(null)

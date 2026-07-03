@@ -65,10 +65,39 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   const restRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    fetch('/api/sessions/active').then(r => r.json()).then(d => {
-      if (d.session) setActiveSession(d.session)
+    // Load session metadata + rehydrate exercises from DB
+    Promise.all([
+      fetch('/api/sessions/active').then(r => r.json()),
+      fetch('/api/sessions/' + sessionId + '/load').then(r => r.json()),
+    ]).then(([activeData, loadData]) => {
+      if (activeData.session) setActiveSession(activeData.session)
+      if (loadData.exercises && loadData.exercises.length > 0 && exercises.length === 0) {
+        loadData.exercises.forEach((ex: any, i: number) => {
+          addExercise({
+            id: ex.exercise_id,
+            session_exercise_id: ex.id,
+            exercise_id: ex.exercise_id,
+            name: ex.exercises?.name ?? '',
+            muscle_group_primary: ex.exercises?.muscle_group_primary ?? '',
+            slug: ex.exercises?.slug ?? '',
+            order_in_session: ex.order_in_session ?? i,
+            sets: (ex.sets ?? []).map((s: any) => ({
+              id: s.id,
+              set_number: s.set_number,
+              set_type: s.set_type,
+              weight_kg: s.weight_kg,
+              reps_completed: s.reps_completed,
+              rir_actual: s.rir_actual,
+              rpe_actual: s.rpe_actual,
+              notes: s.notes,
+              logged_at: s.logged_at,
+            }))
+          })
+        })
+        setCurrentExerciseIndex(0)
+      }
     }).catch(() => {})
-  }, [])
+  }, [sessionId])
 
   useEffect(() => {
     const startStr = activeSession?.started_at
@@ -215,16 +244,16 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   }
 
   const endSession = async () => {
-    if (!activeSession?.id || ending) return
+    if (ending) return
     setEnding(true)
     try {
-      const sid = activeSession.id ?? sessionId
-      const res = await fetch('/api/sessions/' + sid + '/end', {
+      // Always use sessionId from URL params — activeSession may not be loaded yet
+      const res = await fetch('/api/sessions/' + sessionId + '/end', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }
       })
       if (!res.ok) throw new Error('end failed')
       clearSession()
-      router.push('/' + locale + '/session/' + sid + '/feedback')
+      router.push('/' + locale + '/session/' + sessionId + '/feedback')
     } catch (e) {
       console.error(e)
       setEnding(false)

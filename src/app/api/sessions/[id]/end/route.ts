@@ -42,8 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     await (admin as any).from('training_sessions').update({
       status: 'feedback_pending',
-      ended_at: endedAt.toISOString(),
-      duration_minutes: durationMinutes
+      ended_at: endedAt.toISOString()
+      // duration_minutes is a generated column — auto-computed from ended_at - started_at
     }).eq('id', sessionId)
 
     return NextResponse.json({ success: true, redirect_to: 'feedback', durationMinutes })
