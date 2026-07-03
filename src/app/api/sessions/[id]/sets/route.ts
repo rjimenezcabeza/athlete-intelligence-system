@@ -31,6 +31,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'session_exercise_id y set_number requeridos' }, { status: 400 })
     }
     const admin = db()
+
+    // Verify session ownership
+    const { data: profile } = await (admin as any)
+      .from('athlete_profiles').select('id').eq('user_id', user.id).single()
+    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    const { data: session } = await (admin as any)
+      .from('training_sessions').select('id').eq('id', sessionId).eq('athlete_id', profile.id).maybeSingle()
+    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+
     const { data: setData, error } = await (admin as any)
       .from('sets')
       .insert({

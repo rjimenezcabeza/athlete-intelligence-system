@@ -36,8 +36,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       local_fatigue: body.local_fatigue ?? null,
       perceived_recovery: body.perceived_recovery ?? null,
       rir_session_avg: body.rir_session_avg ?? null,
+      feedback_completed_at: new Date().toISOString(),
       status: 'completed',
-      ended_at: new Date().toISOString()
     }).eq('id', id).eq('athlete_id', profile.id)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
