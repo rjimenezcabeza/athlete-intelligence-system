@@ -43,9 +43,10 @@ export async function GET() {
         .limit(1)
         .maybeSingle(),
       (supabase as any)
-        .from('sets')
+        .from('exercise_history')
         .select('id', { count: 'exact', head: true })
-        .eq('is_personal_record', true),
+        .eq('athlete_id', profile.id)
+        .not('pr_set_id', 'is', null),
       // Last 16 weeks of sessions for streak calc
       (supabase as any)
         .from('training_sessions')

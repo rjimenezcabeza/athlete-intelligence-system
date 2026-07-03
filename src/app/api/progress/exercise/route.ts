@@ -37,11 +37,16 @@ export async function GET(req: NextRequest) {
       .from('session_exercises')
       .select('id, session_id, training_sessions(session_date, athlete_id)')
       .eq('exercise_id', exerciseId)
-      .order('session_id', { ascending: false })
-      .limit(20)
+      .limit(100)
 
+    // Sort by session_date descending (session_id UUID is not chronological)
     const filtered = (sessionExercises ?? [])
       .filter((se: any) => se.training_sessions?.athlete_id === profile.id)
+      .sort((a: any, b: any) => {
+        const da = a.training_sessions?.session_date ?? ''
+        const db_ = b.training_sessions?.session_date ?? ''
+        return db_.localeCompare(da)
+      })
       .slice(0, 12)
 
     if (filtered.length === 0) return NextResponse.json({ data: [] })
