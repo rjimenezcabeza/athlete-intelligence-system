@@ -44,9 +44,18 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const isEs = locale === 'es'
 
+  // Custom exercise creation
+  const [showCreate, setShowCreate] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createMuscle, setCreateMuscle] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createErr, setCreateErr] = useState('')
+
   // AI Companion
   const [aiMessage, setAiMessage] = useState<string|null>(null)
   const [aiLoading, setAiLoading] = useState(false)
+  const [coachLog, setCoachLog] = useState<string[]>([])
+  const [showCoachLog, setShowCoachLog] = useState(false)
   const aiDismissTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
 
   // Rest timer
@@ -117,28 +126,35 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
   useEffect(() => { return () => { if (aiDismissTimer.current) clearTimeout(aiDismissTimer.current) } }, [])
 
   // AI Companion — react to each set logged
-  const getAiReaction = useCallback(async (setsCount: number, exerciseName: string, lastSet: any) => {
+  const getAiReaction = useCallback(async (setsCount: number, exerciseName: string, lastSet: any, allExSets: any[]) => {
     if (!lastSet) return
     setAiLoading(true)
     setAiMessage(null)
     try {
-      const prompt = isEs
-        ? `En 1 frase corta y motivadora, reacciona a esta serie: ${exerciseName} - ${lastSet.weight_kg}kg × ${lastSet.reps_completed} reps${lastSet.rir_actual!=null?`, RIR ${lastSet.rir_actual}`:''} (serie ${setsCount} del entreno). Sé directo, específico y energético. Sin emojis al inicio.`
-        : `In 1 short motivating sentence, react to this set: ${exerciseName} - ${lastSet.weight_kg}kg × ${lastSet.reps_completed} reps${lastSet.rir_actual!=null?`, RIR ${lastSet.rir_actual}`:''} (set ${setsCount} of workout). Be direct, specific and energetic. No emojis at start.`
-      const res = await fetch('/api/ai/coach', {
+      const res = await fetch('/api/ai/session-set', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+        body: JSON.stringify({
+          exerciseName,
+          weightKg: lastSet.weight_kg,
+          reps: lastSet.reps_completed,
+          rir: lastSet.rir_actual,
+          setNumber: lastSet.set_number ?? setsCount,
+          locale,
+          previousSets: allExSets.slice(0, -1),
+          totalSetsToday: setsCount,
+        })
       })
       const data = await res.json()
-      const msg = data.content ?? data.message ?? data.text ?? null
+      const msg = data.message ?? null
       if (msg) {
         setAiMessage(msg.trim())
+        setCoachLog(prev => [msg.trim(), ...prev].slice(0, 6))
         if (aiDismissTimer.current) clearTimeout(aiDismissTimer.current)
-        aiDismissTimer.current = setTimeout(() => setAiMessage(null), 8000)
+        aiDismissTimer.current = setTimeout(() => setAiMessage(null), 10000)
       }
     } catch {}
     setAiLoading(false)
-  }, [isEs])
+  }, [locale])
 
   // Auto-trigger rest + AI reaction when a new set is logged
   const prevSetsCount = useRef(0)
@@ -147,15 +163,14 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
     if (totalSets > prevSetsCount.current) {
       if (prevSetsCount.current > 0) startRest(restTotal)
       // Get last logged set for AI reaction
-      const allSets = exercises.flatMap(e => e.sets)
-      const lastSet = allSets[allSets.length - 1]
       const lastEx = [...exercises].reverse().find(e => e.sets.length > 0)
-      if (lastSet && lastEx) {
-        getAiReaction(totalSets, lastEx.name, lastSet)
+      if (lastEx) {
+        const lastSet = lastEx.sets[lastEx.sets.length - 1]
+        if (lastSet) getAiReaction(totalSets, lastEx.name, lastSet, lastEx.sets)
       }
     }
     prevSetsCount.current = totalSets
-  }, [totalSets, startRest, restTotal, getAiReaction])
+  }, [totalSets, startRest, restTotal, getAiReaction, exercises])
 
   const fmt = (s: number) => {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = s % 60
@@ -181,6 +196,22 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
       setShowSearch(false); setQuery('')
     } catch (e) { console.error(e) }
     setAdding(false)
+  }
+
+  const createAndAdd = async () => {
+    if (!createName.trim() || !createMuscle.trim()) return
+    setCreating(true); setCreateErr('')
+    try {
+      const res = await fetch('/api/exercises/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: createName.trim(), muscle_group_primary: createMuscle.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      await addEx({ id: data.exercise.id, name: data.exercise.name, muscle_group_primary: data.exercise.muscle_group_primary, slug: data.exercise.slug })
+      setShowCreate(false); setCreateName(''); setCreateMuscle('')
+    } catch (e) { setCreateErr(e instanceof Error ? e.message : String(e)) }
+    setCreating(false)
   }
 
   const endSession = async () => {
@@ -269,36 +300,72 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
         </div>
       )}
 
-      {/* ── AI Companion banner ── */}
-      {(aiLoading || aiMessage) && (
+      {/* ── AI Companion ── */}
+      {(aiLoading || aiMessage || coachLog.length > 0) && (
         <div style={{
-          background: 'rgba(167,139,250,0.07)',
-          borderBottom: '1px solid rgba(167,139,250,0.18)',
-          padding: '10px 20px',
-          display: 'flex', alignItems: 'center', gap: 10, minHeight: 46,
+          background: 'linear-gradient(135deg, rgba(167,139,250,0.06), rgba(167,139,250,0.02))',
+          borderBottom: '1px solid rgba(167,139,250,0.15)',
         }}>
-          <span style={{ fontSize: 18, flexShrink: 0 }}>🤖</span>
-          {aiLoading ? (
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {[0,1,2].map(i => (
-                <div key={i} style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: '#A78BFA', opacity: 0.5,
-                  animation: `bounce 1.2s ease-in-out ${i*0.2}s infinite`,
-                }}/>
+          {/* Current / loading message */}
+          <div style={{ padding: '10px 20px', display: 'flex', alignItems: 'flex-start', gap: 10, minHeight: 48 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+              background: 'linear-gradient(135deg, #A78BFA, #7C3AED)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, boxShadow: '0 2px 8px rgba(167,139,250,0.35)',
+            }}>🧠</div>
+            {aiLoading ? (
+              <div style={{ display: 'flex', gap: 5, alignItems: 'center', paddingTop: 6 }}>
+                {[0,1,2].map(i => (
+                  <div key={i} style={{
+                    width: 7, height: 7, borderRadius: '50%', background: '#A78BFA',
+                    animation: `coachPulse 1.2s ease-in-out ${i*0.18}s infinite`,
+                  }}/>
+                ))}
+                <style>{`@keyframes coachPulse{0%,80%,100%{opacity:0.25;transform:scale(0.85)}40%{opacity:1;transform:scale(1.15)}}`}</style>
+              </div>
+            ) : aiMessage ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <p style={{ margin: 0, fontSize: 13, color: '#DDD6FE', fontFamily: 'Inter, sans-serif', lineHeight: 1.5, paddingTop: 3 }}>
+                  {aiMessage}
+                </p>
+                <button onClick={() => setAiMessage(null)} style={{
+                  background: 'none', border: 'none', color: 'rgba(167,139,250,0.35)',
+                  cursor: 'pointer', fontSize: 15, padding: '2px 0', flexShrink: 0,
+                  lineHeight: 1, transition: 'color 0.15s',
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'rgba(167,139,250,0.35)')}
+                >✕</button>
+              </div>
+            ) : coachLog.length > 0 ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 3 }}>
+                <p style={{ margin: 0, fontSize: 12, color: 'rgba(167,139,250,0.5)', fontFamily: 'Inter, sans-serif', fontStyle: 'italic' }}>
+                  {isEs ? 'Coach listo para la siguiente serie' : 'Coach ready for next set'}
+                </p>
+                {coachLog.length > 1 && (
+                  <button onClick={() => setShowCoachLog(v => !v)} style={{
+                    background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)',
+                    borderRadius: 8, color: '#A78BFA', cursor: 'pointer',
+                    fontSize: 10, fontWeight: 700, fontFamily: 'Syne, sans-serif',
+                    padding: '4px 10px', whiteSpace: 'nowrap', letterSpacing: '0.05em',
+                  }}>{showCoachLog ? '▲' : `▼ ${isEs ? 'Ver log' : 'Log'} (${coachLog.length})`}</button>
+                )}
+              </div>
+            ) : null}
+          </div>
+          {/* Coach log — last N messages */}
+          {showCoachLog && coachLog.length > 1 && (
+            <div style={{ borderTop: '1px solid rgba(167,139,250,0.1)', padding: '8px 20px 12px 58px' }}>
+              {coachLog.slice(1).map((msg, i) => (
+                <p key={i} style={{
+                  margin: '0 0 6px', fontSize: 11, lineHeight: 1.4,
+                  color: `rgba(196,181,253,${0.55 - i * 0.1})`,
+                  fontFamily: 'Inter, sans-serif',
+                  borderLeft: '2px solid rgba(167,139,250,0.15)', paddingLeft: 10,
+                }}>{msg}</p>
               ))}
-              <style>{`@keyframes bounce{0%,80%,100%{transform:scale(0.8)}40%{transform:scale(1.2)}}`}</style>
             </div>
-          ) : (
-            <p style={{ margin: 0, fontSize: 12, color: '#C4B5FD', fontFamily: 'Inter, sans-serif', lineHeight: 1.4, flex: 1 }}>
-              {aiMessage}
-            </p>
-          )}
-          {aiMessage && (
-            <button onClick={() => setAiMessage(null)} style={{
-              background: 'none', border: 'none', color: '#44445a',
-              cursor: 'pointer', fontSize: 14, padding: 0, flexShrink: 0
-            }}>✕</button>
           )}
         </div>
       )}
@@ -452,16 +519,16 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
                 }}
                 onFocus={() => setInputFocus(true)} onBlur={() => setInputFocus(false)} />
             </div>
-            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '0 20px 48px' }}>
+            <div style={{ flex: 1, overflowY: 'auto' as const, padding: '0 20px 12px' }}>
               {searching ? (
                 <div style={{ textAlign: 'center' as const, padding: 40 }}>
                   <div style={{ width: 28, height: 28, border: `2px solid ${accentColor}`, borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto', animation: 'spin 0.8s linear infinite' }} />
                   <style dangerouslySetInnerHTML={{ __html: '@keyframes spin{to{transform:rotate(360deg)}}' }} />
                 </div>
               ) : results.length === 0 ? (
-                <p style={{ textAlign: 'center' as const, color: T3, padding: 40, fontFamily: 'Inter, sans-serif' }}>
+                <div style={{ textAlign: 'center' as const, padding: '30px 0 16px', fontFamily: 'Inter, sans-serif', color: T3, fontSize: 14 }}>
                   {isEs ? 'Sin resultados' : 'No results'}
-                </p>
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
                   {results.map(ex => (
@@ -491,6 +558,66 @@ export function ActiveSession({ sessionId, locale }: ActiveSessionProps) {
                   ))}
                 </div>
               )}
+
+              {/* ── Create custom exercise ── */}
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
+                {!showCreate ? (
+                  <button onClick={() => { setShowCreate(true); setCreateName(query); setCreateErr('') }} style={{
+                    width: '100%', background: 'transparent',
+                    border: `1.5px dashed ${accentColor}40`,
+                    borderRadius: 14, padding: '13px 16px',
+                    color: accentColor, fontSize: 13, fontWeight: 700,
+                    fontFamily: 'Syne, sans-serif', cursor: 'pointer',
+                    letterSpacing: '0.04em', transition: 'all 0.15s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                  }}>
+                    <span style={{ fontSize: 16 }}>✦</span>
+                    {isEs ? 'Crear ejercicio personalizado' : 'Create custom exercise'}
+                  </button>
+                ) : (
+                  <div style={{ background: '#0d0d14', border: `1px solid ${accentColor}30`, borderRadius: 16, padding: 16 }}>
+                    <p style={{ color: accentColor, fontSize: 11, fontWeight: 800, fontFamily: 'Syne, sans-serif', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 12 }}>
+                      ✦ {isEs ? 'Nuevo ejercicio' : 'New exercise'}
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+                      <input
+                        type="text" value={createName} onChange={e => setCreateName(e.target.value)}
+                        placeholder={isEs ? 'Nombre del ejercicio...' : 'Exercise name...'}
+                        style={{
+                          width: '100%', background: '#16161f', border: `1.5px solid ${BORDER}`,
+                          borderRadius: 10, color: T1, fontFamily: 'Inter, sans-serif',
+                          fontSize: 14, padding: '11px 14px', outline: 'none', boxSizing: 'border-box' as const
+                        }} />
+                      <input
+                        type="text" value={createMuscle} onChange={e => setCreateMuscle(e.target.value)}
+                        placeholder={isEs ? 'Grupo muscular (ej: pecho, espalda...)' : 'Muscle group (e.g. chest, back...)'}
+                        style={{
+                          width: '100%', background: '#16161f', border: `1.5px solid ${BORDER}`,
+                          borderRadius: 10, color: T1, fontFamily: 'Inter, sans-serif',
+                          fontSize: 14, padding: '11px 14px', outline: 'none', boxSizing: 'border-box' as const
+                        }} />
+                      {createErr && <p style={{ color: '#FF6B6B', fontSize: 12, fontFamily: 'Inter, sans-serif', margin: 0 }}>{createErr}</p>}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => { setShowCreate(false); setCreateErr('') }} style={{
+                          flex: 1, background: 'transparent', border: `1px solid ${BORDER}`,
+                          borderRadius: 10, padding: '11px 0', color: T3, fontSize: 12,
+                          fontWeight: 700, fontFamily: 'Syne, sans-serif', cursor: 'pointer',
+                        }}>{isEs ? 'Cancelar' : 'Cancel'}</button>
+                        <button onClick={createAndAdd} disabled={creating || !createName.trim() || !createMuscle.trim()} style={{
+                          flex: 2, background: creating ? '#1a1a2e' : `linear-gradient(135deg,${accentColor},${accentColor}cc)`,
+                          border: 'none', borderRadius: 10, padding: '11px 0',
+                          color: '#0A0A0F', fontSize: 13, fontWeight: 800,
+                          fontFamily: 'Syne, sans-serif', cursor: 'pointer',
+                          opacity: (!createName.trim() || !createMuscle.trim()) ? 0.4 : 1,
+                        }}>
+                          {creating ? '...' : (isEs ? '+ Crear y añadir' : '+ Create & add')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ height: 32 }} />
             </div>
           </div>
         </div>
