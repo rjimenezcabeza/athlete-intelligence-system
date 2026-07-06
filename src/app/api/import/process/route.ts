@@ -334,11 +334,28 @@ export async function POST(request: Request) {
       })
 
       const rawText = response.content[0].type === 'text' ? response.content[0].text : ''
-      const cleanText = rawText
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim()
+      // Robust JSON extraction — handle code fences, preamble text, etc.
+      let cleanText = rawText.trim()
+
+      // 1. Try to extract from ```json ... ``` block first
+      const jsonFenceMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)```/)
+      if (jsonFenceMatch) {
+        cleanText = jsonFenceMatch[1].trim()
+      } else {
+        // 2. Strip leading/trailing code fence markers
+        cleanText = cleanText
+          .replace(/^```(?:json)?\s*/i, '')
+          .replace(/\s*```$/i, '')
+          .trim()
+      }
+
+      // 3. Find JSON object boundaries in case there's surrounding text
+      const firstBrace = cleanText.indexOf('{')
+      const lastBrace = cleanText.lastIndexOf('}')
+      if (firstBrace > 0 && lastBrace > firstBrace) {
+        cleanText = cleanText.slice(firstBrace, lastBrace + 1)
+      }
+
       extractedData = JSON.parse(cleanText)
     } catch (aiError) {
       extractionNotes = `AI extraction failed: ${aiError instanceof Error ? aiError.message : 'unknown'}`

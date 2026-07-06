@@ -24,8 +24,25 @@ async function getUser() {
   return (await supa.auth.getUser()).data.user
 }
 
-export async function POST() {
+const LOCALE_LANG: Record<string, string> = {
+  es: 'Spanish',
+  en: 'English',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  nl: 'Dutch',
+}
+
+export async function POST(request: Request) {
   try {
+    let locale = 'es'
+    try {
+      const body = await request.json()
+      locale = body.locale || 'es'
+    } catch { /* no body */ }
+
+    const language = LOCALE_LANG[locale] || 'Spanish'
+
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -75,6 +92,8 @@ Recent progressions: ${JSON.stringify(progressions.slice(0, 5).map((p: any) => (
         role: 'user',
         content: `You are an expert strength coach AI. Based on this athlete's data, generate 3-5 specific, actionable suggestions.
 
+CRITICAL: You MUST respond EXCLUSIVELY in ${language}. Every word in recommendation_text and reasoning MUST be in ${language}. Do NOT use any other language.
+
 ${dataContext}
 
 Return ONLY valid JSON array (no markdown):
@@ -82,7 +101,8 @@ Return ONLY valid JSON array (no markdown):
   {
     "id": "unique_id",
     "recommendation_type": "volume_adjustment|recovery_warning|progression_opportunity|technique_reminder|consistency",
-    "recommendation_text": "Specific, personalized suggestion in 1-2 sentences",
+    "recommendation_text": "Specific, personalized suggestion in 1-2 sentences (in ${language})",
+    "reasoning": "Brief reasoning (in ${language})",
     "priority": "high|medium|low"
   }
 ]
@@ -94,7 +114,7 @@ Types:
 - technique_reminder: RIR/effort concerns (if avg RIR < 1)
 - consistency: attendance patterns
 
-Be specific with numbers. Reference the actual data.`
+Be specific with numbers. Reference the actual data. ALL TEXT IN ${language.toUpperCase()}.`
       }]
     })
 

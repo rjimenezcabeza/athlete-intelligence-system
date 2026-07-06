@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { AthleteTabBar } from '@/components/athlete/AthleteTabBar'
 
 const BG   = 'var(--bg-primary,#0A0A0F)'
 const CARD = 'var(--card-bg,rgba(255,255,255,0.04))'
@@ -84,44 +85,20 @@ export default function AthletePage() {
     { label: isEs ? 'Racha' : 'Streak', value: `${data?.stats?.currentStreak ?? 0}d`, color: '#FFC107' },
   ]
 
-  const cards = [
-    {
-      id: 'program', icon: '💪',
-      title: isEs ? 'Programa' : 'Program',
-      sub: hasProgram ? `${program?.split_type ?? ''} · ${programDays.length} ${isEs ? 'días' : 'days'}` : isEs ? 'Sin datos' : 'No data',
-      preview: hasProgram
-        ? programDays.slice(0, 3).map((d: any) => d.day_label || `Día ${d.day_number}`).join(' · ')
-        : isEs ? 'Importa tu programa de entreno' : 'Import your training plan',
-      hasData: hasProgram, href: `/${locale}/athlete/program`, accentColor: '#4ADE80',
-    },
-    {
-      id: 'nutrition', icon: '🥗',
-      title: isEs ? 'Nutrición' : 'Nutrition',
-      sub: hasNutrition ? `${data!.nutrition.caloriesTarget} kcal/día` : isEs ? 'Sin datos' : 'No data',
-      preview: hasNutrition
-        ? `P:${data!.nutrition.proteinG}g · C:${data!.nutrition.carbsG}g · G:${data!.nutrition.fatG}g`
-        : isEs ? 'Importa tu plan nutricional' : 'Import your nutrition plan',
-      hasData: hasNutrition, href: `/${locale}/athlete/nutrition`, accentColor: '#FFA500',
-    },
-    {
-      id: 'supplements', icon: '💊',
-      title: isEs ? 'Suplementos' : 'Supplements',
-      sub: hasSupplements ? `${supplements.length} ${isEs ? 'productos' : 'products'}` : isEs ? 'Sin datos' : 'No data',
-      preview: hasSupplements
-        ? supplements.slice(0, 2).map((s: any) => s.name).join(', ')
-        : isEs ? 'Extrae tu pila de suplementos' : 'Extract your supplement stack',
-      hasData: hasSupplements, href: `/${locale}/athlete/nutrition#supplements`, accentColor: '#A78BFA',
-    },
-    {
-      id: 'metrics', icon: '⚖️',
-      title: isEs ? 'Métricas' : 'Metrics',
-      sub: data?.profile?.bodyWeightKg ? `${data.profile.bodyWeightKg} kg` : isEs ? 'Sin datos' : 'No data',
-      preview: data?.profile?.heightCm
-        ? `${data.profile.heightCm}cm · ${data.profile.trainingExperienceYears ?? '?'} ${isEs ? 'años exp.' : 'yrs exp.'}`
-        : isEs ? 'Peso, talla, experiencia' : 'Weight, height, experience',
-      hasData: !!data?.profile?.bodyWeightKg, href: `/${locale}/athlete/metrics`, accentColor: '#38BDF8',
-    },
-  ]
+  // Only the program card remains — metrics/nutrition/técnica/historial are now tabs
+  const programCard = {
+    id: 'program', icon: '💪',
+    title: isEs ? 'Programa Activo' : 'Active Program',
+    sub: hasProgram
+      ? `${program?.split_type ?? ''} · ${programDays.length} ${isEs ? 'días' : 'days'}`
+      : isEs ? 'Sin programa' : 'No program',
+    preview: hasProgram
+      ? programDays.slice(0, 3).map((d: any) => d.day_label || `Día ${d.day_number}`).join(' · ')
+      : isEs ? 'Importa tu programa de entreno' : 'Import your training plan',
+    hasData: hasProgram,
+    href: `/${locale}/athlete/program`,
+    accentColor: '#4ADE80',
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: BG, color: T1, paddingBottom: 100 }}>
@@ -132,8 +109,13 @@ export default function AthletePage() {
         .card-tap:active { transform: scale(0.96); }
       `}</style>
 
+      {/* TAB BAR */}
+      <div style={{ paddingTop: 52 }}>
+        <AthleteTabBar locale={locale} />
+      </div>
+
       {/* HEADER */}
-      <div style={{ padding:'52px 20px 16px', animation:'fadeUp .35s ease-out' }}>
+      <div style={{ padding:'16px 20px 16px', animation:'fadeUp .35s ease-out' }}>
         <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:14 }}>
           <div style={{
             width:52, height:52, borderRadius:'50%', flexShrink:0,
@@ -204,35 +186,28 @@ export default function AthletePage() {
           </div>
         )}
 
-        {/* CARDS GRID 2×2 */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
-          {cards.map((card,i)=>(
-            <Link key={card.id} href={card.href} style={{textDecoration:'none'}}>
-              <div className="card-tap" style={{
-                padding:'16px 14px',background:CARD,border:`1px solid ${BDR}`,borderRadius:16,
-                display:'flex',flexDirection:'column',gap:8,minHeight:130,
-                position:'relative',overflow:'hidden',
-                animation:`fadeUp .4s ease-out ${i*60+200}ms both`,
-              }}>
-                {card.hasData && (
-                  <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${card.accentColor},transparent)`,borderRadius:'16px 16px 0 0'}}/>
-                )}
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                  <span style={{fontSize:26}}>{card.icon}</span>
-                  {card.hasData && <div style={{width:8,height:8,borderRadius:'50%',background:card.accentColor}}/>}
-                </div>
-                <div>
-                  <p style={{margin:0,fontSize:13,fontWeight:700,color:T1,fontFamily:'Syne,sans-serif'}}>{card.title}</p>
-                  <p style={{margin:'2px 0 0',fontSize:11,color:card.hasData?card.accentColor:T3,fontFamily:'DM Mono,monospace'}}>{card.sub}</p>
-                </div>
-                <p style={{margin:0,fontSize:10,color:T3,fontFamily:'DM Mono,monospace',lineHeight:1.4,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
-                  {loading?'···':card.preview}
-                </p>
-                <div style={{position:'absolute',bottom:12,right:12,fontSize:14,color:T3}}>→</div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        {/* PROGRAM CARD — full width */}
+        <Link href={programCard.href} style={{textDecoration:'none',marginBottom:4}}>
+          <div className="card-tap" style={{
+            padding:'16px 18px',background:CARD,border:`1px solid ${BDR}`,borderRadius:16,
+            display:'flex',alignItems:'center',gap:16,
+            position:'relative',overflow:'hidden',
+            animation:'fadeUp .4s ease-out 200ms both',
+          }}>
+            {programCard.hasData && (
+              <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${programCard.accentColor},transparent)`,borderRadius:'16px 16px 0 0'}}/>
+            )}
+            <span style={{fontSize:28,flexShrink:0}}>{programCard.icon}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{margin:0,fontSize:14,fontWeight:700,color:T1,fontFamily:'Syne,sans-serif'}}>{programCard.title}</p>
+              <p style={{margin:'2px 0 0',fontSize:11,color:programCard.hasData?programCard.accentColor:T3,fontFamily:'DM Mono,monospace'}}>{programCard.sub}</p>
+              <p style={{margin:'4px 0 0',fontSize:10,color:T3,fontFamily:'DM Mono,monospace',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>
+                {loading?'···':programCard.preview}
+              </p>
+            </div>
+            <span style={{fontSize:16,color:T3,flexShrink:0}}>→</span>
+          </div>
+        </Link>
 
         {/* COACH IA BANNER */}
         <Link href={`/${locale}/coach`} style={{textDecoration:'none',display:'block',marginBottom:12}}>

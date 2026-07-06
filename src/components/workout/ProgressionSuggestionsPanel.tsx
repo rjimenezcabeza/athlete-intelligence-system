@@ -20,28 +20,41 @@ interface Suggestion {
   reasoning: string | null
 }
 
+const UI: Record<string, { analyzing: string; great: string; noChanges: string; suggestions: string }> = {
+  es: { analyzing: 'Analizando tu sesión...', great: '¡Buen entrenamiento!', noChanges: 'Sin cambios necesarios por ahora.', suggestions: 'Sugerencias IA' },
+  en: { analyzing: 'Analyzing your session...', great: 'Great workout!', noChanges: 'No changes needed for now.', suggestions: 'AI Suggestions' },
+  fr: { analyzing: 'Analyse de ta séance...', great: 'Bel entraînement!', noChanges: 'Aucun changement nécessaire.', suggestions: 'Suggestions IA' },
+  de: { analyzing: 'Analysiere deine Session...', great: 'Gutes Training!', noChanges: 'Keine Änderungen nötig.', suggestions: 'KI-Vorschläge' },
+  it: { analyzing: 'Analizzando la tua sessione...', great: 'Ottimo allenamento!', noChanges: 'Nessuna modifica necessaria.', suggestions: 'Suggerimenti IA' },
+  nl: { analyzing: 'Je sessie analyseren...', great: 'Geweldige training!', noChanges: 'Geen wijzigingen nodig.', suggestions: 'AI-suggesties' },
+}
+
 export function ProgressionSuggestionsPanel({ sessionId, locale }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [loading, setLoading] = useState(true)
-  const isEs = locale === 'es'
+  const t = UI[locale] ?? UI.es
 
   useEffect(() => {
     if (!sessionId) return
-    fetch(`/api/ai/suggestions?sessionId=${sessionId}`, { method: 'POST' })
+    fetch('/api/ai/suggestions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, locale }),
+    })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data.suggestions)) setSuggestions(data.suggestions)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [sessionId])
+  }, [sessionId, locale])
 
   if (loading) {
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
         <div style={{ fontSize: 24, marginBottom: 8 }}>🤖</div>
         <p style={{ margin: 0, fontSize: 12, color: T3, fontFamily: 'DM Mono,monospace' }}>
-          {isEs ? 'Analizando tu sesión...' : 'Analyzing your session...'}
+          {t.analyzing}
         </p>
       </div>
     )
@@ -52,10 +65,10 @@ export function ProgressionSuggestionsPanel({ sessionId, locale }: Props) {
       <div style={{ padding: '20px', textAlign: 'center', background: CARD, border: `1px solid ${BDR}`, borderRadius: 14 }}>
         <div style={{ fontSize: 24, marginBottom: 8 }}>✅</div>
         <p style={{ margin: 0, fontSize: 13, color: T2, fontFamily: 'Syne,sans-serif', fontWeight: 700 }}>
-          {isEs ? '¡Buen entrenamiento!' : 'Great workout!'}
+          {t.great}
         </p>
         <p style={{ margin: '4px 0 0', fontSize: 11, color: T3, fontFamily: 'DM Mono,monospace' }}>
-          {isEs ? 'Sin cambios necesarios por ahora.' : 'No changes needed for now.'}
+          {t.noChanges}
         </p>
       </div>
     )
@@ -64,7 +77,7 @@ export function ProgressionSuggestionsPanel({ sessionId, locale }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <p style={{ margin: '0 0 4px', fontSize: 11, color: T3, fontFamily: 'DM Mono,monospace', textTransform: 'uppercase', letterSpacing: '.1em' }}>
-        {isEs ? 'Sugerencias IA' : 'AI Suggestions'}
+        {t.suggestions}
       </p>
       {suggestions.map(s => (
         <div key={s.id} style={{

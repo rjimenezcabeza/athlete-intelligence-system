@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { AthleteTabBar } from '@/components/athlete/AthleteTabBar'
 
 const BG=`var(--bg-primary,#0A0A0F)`,CARD=`var(--card-bg,rgba(255,255,255,.04))`,BDR=`var(--card-border,rgba(255,255,255,.08))`,T1=`var(--text-primary,#fff)`,T2=`var(--text-secondary,#888)`,T3=`var(--text-tertiary,#44445a)`,ACC=`var(--accent-color,#C8FF00)`
 
@@ -26,11 +27,12 @@ export default function ProgramPage() {
     <div style={{minHeight:'100vh',background:BG,color:T1,paddingBottom:100}}>
       <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
 
+      <div style={{ paddingTop: 52 }}>
+        <AthleteTabBar locale={locale} />
+      </div>
+
       {/* HEADER */}
-      <div style={{padding:'52px 20px 20px',background:`linear-gradient(180deg,rgba(74,222,128,.06) 0%,transparent 100%)`}}>
-        <Link href={`/${locale}/athlete`} style={{display:'inline-flex',alignItems:'center',gap:6,color:T3,fontSize:12,fontFamily:'DM Mono,monospace',textDecoration:'none',marginBottom:16}}>
-          ← {isEs?'Volver':'Back'}
-        </Link>
+      <div style={{padding:'14px 20px 20px',background:`linear-gradient(180deg,rgba(74,222,128,.06) 0%,transparent 100%)`}}>
         <h1 style={{margin:0,fontSize:26,fontWeight:800,fontFamily:'Syne,sans-serif',color:T1,letterSpacing:'-0.02em'}}>
           {'💪 '}{isEs?'Programa de Entrenamiento':'Training Program'}
         </h1>

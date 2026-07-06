@@ -47,9 +47,9 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
     setTimedOut(false)
     processingStartRef.current = null
 
-    // Validate size client-side before upload
-    if (file.size > 3 * 1024 * 1024) {
-      setErrorMsg(isEs ? 'Archivo demasiado grande. Máximo 3MB.' : 'File too large. Maximum 3MB.')
+    // Validate size client-side before upload (4MB binary → ~5.3MB base64; Vercel limit 4.5MB)
+    if (file.size > 4 * 1024 * 1024) {
+      setErrorMsg(isEs ? 'Archivo demasiado grande. Máximo 4MB. Comprime o divide el archivo.' : 'File too large. Maximum 4MB. Please compress or split the file.')
       setStep('error')
       return
     }
@@ -80,6 +80,9 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
         const err = await uploadRes.json().catch(() => ({}))
         if (err.error === 'LIMIT_REACHED') {
           throw new Error(err.message || (isEs ? 'Límite mensual alcanzado' : 'Monthly limit reached'))
+        }
+        if (err.error === 'FILE_TOO_LARGE_FOR_PROXY') {
+          throw new Error(isEs ? 'Archivo demasiado grande (máx. 4MB). Comprime el archivo.' : 'File too large (max 4MB). Please compress the file.')
         }
         throw new Error(err.message || err.error || 'Upload failed')
       }
@@ -305,10 +308,10 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
               {isEs ? 'o haz clic para seleccionar' : 'or click to select'}
             </div>
             <div style={{ fontSize: '11px', color: '#444', fontFamily: 'DM Mono, monospace' }}>
-              PDF, {isEs ? 'imagen' : 'image'}, Excel, Word {isEs ? 'o texto' : 'or text'} · max 3MB
+              PDF, {isEs ? 'imagen' : 'image'} (JPG/PNG/HEIC/WebP), Excel, Word, CSV, TXT · max 4MB
             </div>
             <input type="file" style={{ display: 'none' }}
-              accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.docx,.txt,.csv"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.xlsx,.xls,.xlsm,.docx,.doc,.txt,.csv"
               onChange={handleFileSelect} />
           </label>
         </div>
@@ -509,12 +512,4 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
                 {isEs ? 'Reintentar' : 'Retry'}
               </button>
             ) : null}
-            <button onClick={reset} style={{ padding: '10px 20px', background: '#C8FF00', border: 'none', borderRadius: '10px', color: '#0A0A0F', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>
-              {isEs ? 'Subir de nuevo' : 'Upload again'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+            <button

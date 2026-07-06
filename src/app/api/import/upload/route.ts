@@ -72,11 +72,13 @@ export async function POST(request: Request) {
       contentType = ct || 'application/octet-stream'
 
       // Validate size BEFORE decoding (base64 is ~33% larger than binary)
+      // Vercel body limit: 4.5MB. Base64 of 3.3MB ≈ 4.4MB → safe margin
       const estimatedSize = fileSizeBytes || Math.round(data.length * 0.75)
-      if (estimatedSize > 3 * 1024 * 1024) {
+      if (estimatedSize > 4 * 1024 * 1024) {
         return NextResponse.json({
-          error: 'FILE_TOO_LARGE',
-          message: 'Máximo 3MB por archivo. Comprime el archivo o usa uno más pequeño.'
+          error: 'FILE_TOO_LARGE_FOR_PROXY',
+          useDirectUpload: true,
+          message: 'Archivo mayor de 4MB. Usa la subida directa.'
         }, { status: 413 })
       }
 
@@ -91,10 +93,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File is empty' }, { status: 400 })
     }
 
-    if (buffer.byteLength > 3 * 1024 * 1024) {
+    if (buffer.byteLength > 4 * 1024 * 1024) {
       return NextResponse.json({
-        error: 'FILE_TOO_LARGE',
-        message: 'Máximo 3MB por archivo.'
+        error: 'FILE_TOO_LARGE_FOR_PROXY',
+        useDirectUpload: true,
+        message: 'Archivo mayor de 4MB. Usa la subida directa.'
       }, { status: 413 })
     }
 

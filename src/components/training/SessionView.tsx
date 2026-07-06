@@ -3,22 +3,65 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { SetLogger } from './SetLogger'
-import { useSessionStore } from '@/stores/session.store'
+import { useSessionStore, type ActiveSet } from '@/stores/session.store'
 import { useOfflineSync } from '@/hooks/useOfflineSync'
-import { Button } from '@/components/ui/button'
-import { Play, ChevronRight, CheckCircle } from 'lucide-react'
 
 interface Template { id: string; name: string; training_days_per_week: number | null }
+
+interface TemplateExercise {
+  id: string
+  day_number: number
+  day_label?: string | null
+  order_in_day: number
+  sets_target?: number | null
+  rep_range_min?: number | null
+  rep_range_max?: number | null
+  rir_target?: number | null
+  exercise?: { name: string; muscle_group_primary: string; slug?: string }
+}
+
+interface FullTemplate {
+  id: string
+  name: string
+  training_days_per_week?: number | null
+  split_type?: string | null
+  template_exercises?: TemplateExercise[]
+}
 
 interface SessionViewProps {
   athleteId: string
   weightUnit: 'kg' | 'lbs'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  initialTemplate: any | null
+  initialTemplate: FullTemplate | null
   availableTemplates: Template[]
 }
 
 const DEFAULT_SETS_TARGET = 3
+
+const T = {
+  es: {
+    start: 'Iniciar sesión', starting: 'Iniciando...', noTemplate: 'Sin plantilla',
+    selectDay: 'Selecciona el día', exercises: 'ejercicios', noTemplates: 'Sin plantillas.',
+    createFirst: 'Crea una primero →', template: 'Plantilla', dayLabel: 'Día',
+    preview: 'Vista previa', sets: 'series', reps: 'reps', rir: 'RIR',
+    offline: '⚠ Sin conexión — se guardará localmente',
+    complete: '¡Sesión completada!', duration: 'Duración:', save: 'Guardar y finalizar',
+    exerciseCount: 'ejercicios completados',
+  },
+  en: {
+    start: 'Start session', starting: 'Starting...', noTemplate: 'No template',
+    selectDay: 'Select day', exercises: 'exercises', noTemplates: 'No templates.',
+    createFirst: 'Create one first →', template: 'Template', dayLabel: 'Day',
+    preview: 'Preview', sets: 'sets', reps: 'reps', rir: 'RIR',
+    offline: '⚠ Offline — will save locally',
+    complete: 'Session complete!', duration: 'Duration:', save: 'Save & finish',
+    exerciseCount: 'exercises completed',
+  },
+}
+
+function t(locale: string, key: keyof typeof T['es']): string {
+  const lang = T[locale as 'es' | 'en'] ?? T.es
+  return lang[key]
+}
 
 export function SessionView({ athleteId, initialTemplate, availableTemplates }: SessionViewProps) {
   const router = useRouter()
@@ -34,14 +77,34 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
     setCurrentExerciseIndex,
     clearSession,
   } = useSessionStore()
+
   const [starting, setStarting] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTemplate?.id ?? '')
+  const [selectedDay, setSelectedDay] = useState<number>(1)
   const [elapsed, setElapsed] = useState(0)
 
   void athleteId
 
   const isActive = activeSession !== null
   const sessionId = activeSession?.id ?? null
+
+  // Find the currently selected full template (initialTemplate or none)
+  const selectedTemplate = selectedTemplateId === initialTemplate?.id ? initialTemplate : null
+
+  // Get unique days from template exercises
+  const templateDays = selectedTemplate?.template_exercises
+    ? [...new Map(
+        selectedTemplate.template_exercises
+          .filter(te => te.day_number != null)
+          .map(te => [te.day_number, te])
+      ).values()]
+        .sort((a, b) => a.day_number - b.day_number)
+    : []
+
+  // Exercises for the selected day
+  const dayExercises = selectedTemplate?.template_exercises
+    ?.filter(te => te.day_number === selectedDay)
+    ?.sort((a, b) => a.order_in_day - b.order_in_day) ?? []
 
   useEffect(() => {
     if (!isActive) return
@@ -53,31 +116,34 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
 
   const handleStart = async () => {
     setStarting(true)
-    const res = await fetch('/api/training/sessions', {
+
+    // Use correct API endpoint as per CLAUDE.md
+    const res = await fetch('/api/sessions/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         templateId: selectedTemplateId || null,
+        dayNumber: selectedDay || null,
+        dayLabel: templateDays.find(d => d.day_number === selectedDay)?.day_label || null,
         sessionDate: new Date().toISOString().split('T')[0],
       }),
     })
-    const session = await res.json()
 
-    const template = initialTemplate
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const exs = template?.template_exercises
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ?.sort((a: any, b: any) => a.order_in_day - b.order_in_day)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ?.map((te: any, i: number) => ({
-        id: `${session.id}-${i}`,
-        exercise_id: te.exercise_id,
-        name: te.exercise?.name ?? 'Ejercicio',
-        muscle_group_primary: te.exercise?.muscle_group_primary ?? '',
-        slug: te.exercise?.slug ?? '',
-        order_in_session: i,
-        sets: [] as import('@/stores/session.store').ActiveSet[],
-      })) ?? []
+    if (!res.ok) {
+      setStarting(false)
+      return
+    }
+
+    const { session } = await res.json()
+    const exs = dayExercises.map((te, i) => ({
+      id: `${session.id}-${i}`,
+      exercise_id: te.exercise?.slug ?? te.id,
+      name: te.exercise?.name ?? 'Ejercicio',
+      muscle_group_primary: te.exercise?.muscle_group_primary ?? '',
+      slug: te.exercise?.slug ?? '',
+      order_in_session: i,
+      sets: [] as ActiveSet[],
+    }))
 
     setActiveSession({
       id: session.id,
@@ -85,8 +151,8 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
       template_id: selectedTemplateId || null,
       session_date: new Date().toISOString().split('T')[0],
       started_at: new Date().toISOString(),
-      day_number: null,
-      day_label: null,
+      day_number: selectedDay || null,
+      day_label: templateDays.find(d => d.day_number === selectedDay)?.day_label || null,
     })
     setExercises(exs)
     setStarting(false)
@@ -94,128 +160,64 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
 
   const handleEnd = async () => {
     if (sessionId) {
-      await fetch(`/api/training/sessions/${sessionId}`, {
-        method: 'PATCH',
+      await fetch(`/api/sessions/${sessionId}/end`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ended_at: new Date().toISOString() }),
       })
     }
     clearSession()
-    router.push(`/${locale}/training/history`)
+    router.push(`/${locale}/session/${sessionId}/feedback`)
   }
 
+  // ─── PRE-SESSION UI ───────────────────────────────────────────────
   if (!isActive) {
-    return (
-      <div className="p-4 space-y-6">
-        <div className="pt-2">
-          <h1 className="text-xl font-semibold">Iniciar sesión</h1>
-          {!isOnline && <p className="text-xs text-amber-500 mt-1">⚠ Sin conexión — se guardará localmente</p>}
-        </div>
+    const BG = '#0A0A0F'
+    const CARD = 'rgba(255,255,255,0.04)'
+    const BDR = 'rgba(255,255,255,0.08)'
+    const ACC = '#C8FF00'
 
+    return (
+      <div style={{ padding: '20px 16px', background: BG, minHeight: '100vh' }}>
+        {!isOnline && (
+          <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(255,193,7,0.1)', border: '1px solid rgba(255,193,7,0.3)', borderRadius: 8, fontSize: 12, color: '#FFC107', fontFamily: 'DM Mono,monospace' }}>
+            {t(locale, 'offline')}
+          </div>
+        )}
+
+        <h1 style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 800, color: '#fff', fontFamily: 'Syne,sans-serif' }}>
+          {t(locale, 'start')}
+        </h1>
+
+        {/* Template selector */}
         {availableTemplates.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Plantilla</p>
-            {availableTemplates.map(t => (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, color: '#555', fontFamily: 'DM Mono,monospace', textTransform: 'uppercase', letterSpacing: '.1em' }}>
+              {t(locale, 'template')}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* No template option */}
               <button
-                key={t.id}
-                onClick={() => setSelectedTemplateId(t.id)}
-                className={`w-full text-left rounded-xl border p-3.5 transition-colors ${selectedTemplateId === t.id ? 'border-primary bg-primary/5' : 'border-border/50 bg-card'}`}
+                onClick={() => setSelectedTemplateId('')}
+                style={{
+                  padding: '12px 14px', borderRadius: 12, border: `1px solid ${selectedTemplateId === '' ? ACC : BDR}`,
+                  background: selectedTemplateId === '' ? `${ACC}10` : CARD,
+                  color: selectedTemplateId === '' ? ACC : '#888',
+                  fontSize: 13, textAlign: 'left', cursor: 'pointer', fontFamily: 'DM Mono,monospace'
+                }}
               >
-                <p className="text-sm font-medium">{t.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{t.training_days_per_week} días/semana</p>
+                {t(locale, 'noTemplate')}
               </button>
-            ))}
-          </div>
-        )}
-
-        {availableTemplates.length === 0 && (
-          <div className="rounded-xl border border-border/50 bg-muted/30 p-4 text-sm text-muted-foreground">
-            Sin plantillas. <a href={`/${locale}/training/templates`} className="text-primary">Crea una primero →</a>
-          </div>
-        )}
-
-        <Button className="w-full h-14 text-base font-semibold rounded-2xl" onClick={handleStart} disabled={starting}>
-          <Play className="h-5 w-5 mr-2" />
-          {starting ? 'Iniciando...' : 'Comenzar sesión'}
-        </Button>
-      </div>
-    )
-  }
-
-  const currentEx = exercises[currentExerciseIndex]
-  const totalExercises = exercises.length
-  const completedExercises = exercises.filter(ex => ex.sets.length >= DEFAULT_SETS_TARGET).length
-
-  if (completedExercises === totalExercises && totalExercises > 0) {
-    return (
-      <div className="p-4 flex flex-col items-center justify-center min-h-[60vh] gap-6">
-        <CheckCircle className="h-16 w-16 text-emerald-500" />
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">¡Sesión completada!</h2>
-          <p className="text-sm text-muted-foreground mt-1">Duración: {formatTime(elapsed)}</p>
-        </div>
-        <Button className="w-full h-14 text-base rounded-2xl" onClick={handleEnd}>
-          Guardar y finalizar
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col min-h-screen">
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border/40 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">⏱ {formatTime(elapsed)}</p>
-          <div className="text-xs text-muted-foreground">{completedExercises}/{totalExercises} ejercicios</div>
-        </div>
-        <div className="mt-2 h-1 bg-muted/50 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all"
-            style={{ width: `${totalExercises > 0 ? (completedExercises / totalExercises) * 100 : 0}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="flex-1 p-4">
-        {currentEx && (
-          <SetLogger
-            key={`${currentEx.exercise_id}-${currentEx.sets.length + 1}`}
-            exerciseId={currentEx.exercise_id}
-            exerciseName={currentEx.name}
-            setNumber={currentEx.sets.length + 1}
-            previousWeight={currentEx.sets[currentEx.sets.length - 1]?.weight_kg ?? undefined}
-            previousReps={currentEx.sets[currentEx.sets.length - 1]?.reps_completed ?? undefined}
-            onSetLogged={async (data) => {
-              addSet(currentExerciseIndex, {
-                set_number: data.setNumber,
-                set_type: data.isWarmup ? 'warmup' : 'working',
-                weight_kg: data.weightKg,
-                reps_completed: data.reps,
-                rir_actual: data.rir ?? null,
-                rpe_actual: null,
-                notes: null,
-              })
-              if (currentEx.sets.length + 1 >= DEFAULT_SETS_TARGET) {
-                setCurrentExerciseIndex(Math.min(currentExerciseIndex + 1, totalExercises - 1))
-              }
-            }}
-            onSkip={currentExerciseIndex < totalExercises - 1
-              ? () => setCurrentExerciseIndex(currentExerciseIndex + 1)
-              : undefined}
-          />
-        )}
-      </div>
-
-      {currentExerciseIndex < totalExercises - 1 && (
-        <div className="px-4 pb-24">
-          <button
-            onClick={() => setCurrentExerciseIndex(currentExerciseIndex + 1)}
-            className="w-full text-xs text-muted-foreground flex items-center justify-center gap-1 py-2"
-          >
-            Saltar ejercicio <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
+              {availableTemplates.map(tmpl => (
+                <button
+                  key={tmpl.id}
+                  onClick={() => { setSelectedTemplateId(tmpl.id); setSelectedDay(1) }}
+                  style={{
+                    padding: '14px', borderRadius: 12, border: `1px solid ${selectedTemplateId === tmpl.id ? ACC : BDR}`,
+                    background: selectedTemplateId === tmpl.id ? `${ACC}10` : CARD,
+                    textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: 'Syne,sans-serif' }}>{tmpl.name}</p>
+                 

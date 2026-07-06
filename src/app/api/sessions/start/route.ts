@@ -53,15 +53,13 @@ export async function POST(request: Request) {
     if (body.stress_level != null) insertData.stress_level = Number(body.stress_level)
     if (body.notes) insertData.notes = String(body.notes)
     if (body.body_weight_kg != null) insertData.body_weight_kg = Number(body.body_weight_kg)
+    if (body.templateId) insertData.template_id = String(body.templateId)
+    if (body.dayNumber != null) insertData.day_number = Number(body.dayNumber)
+    if (body.dayLabel) insertData.day_label = String(body.dayLabel)
 
     const { data: session, error } = await (admin as any)
       .from('training_sessions')
       .insert(insertData)
       .select('id, session_date, status, started_at, athlete_id')
       .single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ session })
-  } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
-  }
-}
+    if (error) return NextR
