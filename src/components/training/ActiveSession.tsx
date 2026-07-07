@@ -279,4 +279,255 @@ export function ActiveSession({ sessionId }: { sessionId: string }) {
         <button
           onClick={handleFinish}
           disabled={isSaving}
-          style={{ width: '100%', maxWidth: 360, padding: 18, borderRadius: 16, border: 'none', ba
+          style={{ width: '100%', maxWidth: 360, padding: 18, borderRadius: 16, border: 'none', background: `linear-gradient(135deg,${ACC},#88DD00)`, color: BG, fontSize: 16, fontWeight: 800, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+        >
+          {isSaving ? 'Guardando...' : 'Guardar y salir'}
+        </button>
+      </div>
+    )
+  }
+
+  if (!currentEx) {
+    return (
+      <div style={{ minHeight: '100vh', background: BG, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 32, height: 32, border: `2px solid ${ACC}`, borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      </div>
+    )
+  }
+
+  const previousSets = loggedSets.filter(s => s.exerciseId === currentEx.exerciseId)
+  const lastSet = previousSets[previousSets.length - 1]
+
+  return (
+    <div style={{ minHeight: '100vh', background: BG, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {/* ── Header ─────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${BDR}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: ACC, animation: 'pulse 2s infinite' }} />
+          <span style={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'DM Mono,monospace', fontSize: 13 }}>{elapsed}min</span>
+        </div>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', fontFamily: 'DM Mono,monospace' }}>
+          {currentIndex + 1}/{exercises.length}
+        </span>
+        <button
+          onClick={() => setIsFinished(true)}
+          style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'DM Mono,monospace' }}
+        >
+          TERMINAR
+        </button>
+      </div>
+
+      {/* ── Exercise pills ──────────────────────────── */}
+      <div style={{ display: 'flex', gap: 6, padding: '12px 16px', overflowX: 'auto' }}>
+        {exercises.map((ex, i) => {
+          const done = loggedSets.filter(s => s.exerciseId === ex.exerciseId && !s.isWarmup).length >= ex.setsTarget
+          return (
+            <div
+              key={ex.sessionExerciseId}
+              style={{
+                flexShrink: 0, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'DM Mono,monospace',
+                border: `1px solid ${done ? `${ACC}50` : i === currentIndex ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                background: done ? `${ACC}20` : i === currentIndex ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.05)',
+                color: done ? ACC : i === currentIndex ? '#fff' : 'rgba(255,255,255,0.3)',
+              }}
+            >
+              {done ? '✓ ' : ''}{ex.name.split(' ')[0]}
+            </div>
+          )
+        })}
+        <button
+          onClick={() => setShowExerciseSelector(true)}
+          style={{ flexShrink: 0, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontFamily: 'DM Mono,monospace', border: `1px dashed rgba(255,255,255,0.2)`, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer' }}
+        >
+          + ejercicio
+        </button>
+      </div>
+
+      {/* ── Set progress bars ───────────────────────── */}
+      <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px' }}>
+        {Array.from({ length: currentEx.setsTarget }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              height: 6, flex: 1, borderRadius: 3,
+              background: i < workingSetsDone ? ACC : i === workingSetsDone ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)',
+              transition: 'background 0.3s',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* ── Main content ────────────────────────────── */}
+      <div style={{ flex: 1, padding: '0 16px 120px' }}>
+        {showExerciseSelector ? (
+          <div style={{ borderRadius: 16, background: CARD, border: `1px solid ${BDR}`, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${BDR}` }}>
+              <p style={{ color: '#fff', fontWeight: 600, margin: 0, fontSize: 14 }}>Añadir ejercicio</p>
+              <button
+                onClick={() => setShowExerciseSelector(false)}
+                style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}
+              >✕</button>
+            </div>
+            <QuickExerciseSelector onSelect={handleAddExercise} />
+          </div>
+        ) : (
+          <SetLogger
+            key={`${currentEx.sessionExerciseId}-${currentSetNumber}`}
+            exerciseId={currentEx.exerciseId}
+            exerciseName={currentEx.name}
+            setNumber={currentSetNumber}
+            previousWeight={lastSet?.weightKg}
+            previousReps={lastSet?.reps}
+            onSetLogged={handleSetLogged}
+            onSkip={
+              currentIndex < exercises.length - 1
+                ? () => { setCurrentIndex(i => i + 1); setCurrentSetNumber(1) }
+                : undefined
+            }
+          />
+        )}
+      </div>
+
+      {/* ── Floating AI Chat button ──────────────────── */}
+      <button
+        onClick={() => setShowChat(v => !v)}
+        style={{
+          position: 'fixed', bottom: 24, right: 20, zIndex: 50,
+          width: 52, height: 52, borderRadius: '50%',
+          background: showChat ? '#333' : `linear-gradient(135deg,${ACC},#88DD00)`,
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: `0 4px 20px ${showChat ? 'rgba(0,0,0,0.4)' : `${ACC}40`}`,
+          fontSize: 22, transition: 'all 0.2s',
+        }}
+        title="AI Coach"
+      >
+        {showChat ? '✕' : '🤖'}
+      </button>
+
+      {/* ── AI Chat drawer ───────────────────────────── */}
+      {showChat && (
+        <div
+          style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 40,
+            background: '#111118', borderTop: `1px solid ${BDR}`,
+            borderRadius: '20px 20px 0 0',
+            display: 'flex', flexDirection: 'column',
+            maxHeight: '60vh', minHeight: 320,
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
+            animation: 'slideUp 0.25s ease',
+          }}
+        >
+          {/* Drawer handle + header */}
+          <div style={{ padding: '10px 16px 12px', borderBottom: `1px solid ${BDR}`, flexShrink: 0 }}>
+            <div style={{ width: 32, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)', margin: '0 auto 12px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🤖</span>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'Syne,sans-serif' }}>AI Coach</p>
+                <p style={{ margin: 0, fontSize: 10, color: '#555', fontFamily: 'DM Mono,monospace' }}>
+                  {currentEx.name} · serie {currentSetNumber}/{currentEx.setsTarget}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Message list */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {chatMessages.length === 0 && (
+              <>
+                <p style={{ textAlign: 'center', fontSize: 12, color: '#444', fontFamily: 'DM Mono,monospace', margin: '8px 0 12px' }}>
+                  Pregúntame lo que necesites durante el entrenamiento
+                </p>
+                {/* Quick prompts */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {QUICK_PROMPTS.map(q => (
+                    <button
+                      key={q}
+                      onClick={() => sendChatMessage(q)}
+                      style={{
+                        padding: '6px 10px', borderRadius: 20, fontSize: 11,
+                        border: `1px solid ${BDR}`, background: CARD,
+                        color: '#aaa', cursor: 'pointer', fontFamily: 'DM Mono,monospace',
+                        textAlign: 'left',
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            {chatMessages.map((msg, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: '80%', padding: '10px 14px', borderRadius: 14,
+                    fontSize: 13, lineHeight: 1.5, fontFamily: 'Syne,sans-serif',
+                    background: msg.role === 'user' ? ACC : CARD,
+                    color: msg.role === 'user' ? '#0A0A0F' : '#ddd',
+                    border: msg.role === 'coach' ? `1px solid ${BDR}` : 'none',
+                    borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                  }}
+                >
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {chatLoading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{ padding: '10px 14px', borderRadius: '14px 14px 14px 4px', background: CARD, border: `1px solid ${BDR}` }}>
+                  <span style={{ fontSize: 20, animation: 'pulse 1s infinite' }}>●●●</span>
+                </div>
+              </div>
+            )}
+            <div ref={chatBottomRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{ padding: '10px 16px 16px', borderTop: `1px solid ${BDR}`, flexShrink: 0, display: 'flex', gap: 8 }}>
+            <input
+              ref={inputRef}
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput) } }}
+              placeholder="Pregunta al coach..."
+              disabled={chatLoading}
+              style={{
+                flex: 1, padding: '10px 14px', borderRadius: 12,
+                background: 'rgba(255,255,255,0.05)', border: `1px solid ${BDR}`,
+                color: '#fff', fontSize: 13, outline: 'none', fontFamily: 'Syne,sans-serif',
+              }}
+            />
+            <button
+              onClick={() => sendChatMessage(chatInput)}
+              disabled={chatLoading || !chatInput.trim()}
+              style={{
+                width: 42, height: 42, borderRadius: 12, border: 'none',
+                background: chatInput.trim() ? ACC : 'rgba(255,255,255,0.05)',
+                color: chatInput.trim() ? '#0A0A0F' : '#333',
+                fontSize: 18, cursor: chatInput.trim() ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.15s', flexShrink: 0,
+              }}
+            >
+              ↑
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CSS animations */}
+      <style>{`
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+      `}</style>
+    </div>
+  )
+}

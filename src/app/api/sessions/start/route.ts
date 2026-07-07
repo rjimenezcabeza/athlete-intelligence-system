@@ -62,4 +62,9 @@ export async function POST(request: Request) {
       .insert(insertData)
       .select('id, session_date, status, started_at, athlete_id')
       .single()
-    if (error) return NextR
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ session })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+  }
+}

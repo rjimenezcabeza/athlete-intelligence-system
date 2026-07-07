@@ -209,37 +209,51 @@ export default function DashboardPage() {
         {/* Deload alert — solo visible cuando hay estancamiento */}
         <DeloadAlert locale={locale} />
 
-        {/* KPI Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {/* CTA Entrenar — hero position, lo primero que ve el usuario */}
+        <Link href={'/' + locale + '/session/new'} className="fade-in s1" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: `linear-gradient(135deg, ${ACC} 0%, #9EFF00 100%)`,
+          color: '#0A0A0F', borderRadius: 18, padding: '18px 20px',
+          fontFamily: 'Syne, sans-serif', textDecoration: 'none',
+        }}>
+          <div>
+            <p style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>
+              {isEs ? 'Entrenar ahora' : 'Train now'}
+            </p>
+            <p style={{ fontSize: 11, fontWeight: 600, opacity: 0.65, margin: '3px 0 0', fontFamily: 'DM Mono, monospace' }}>
+              {loading ? '···' : (
+                data?.stats?.totalSessions
+                  ? (isEs ? `${data.stats.totalSessions} sesiones completadas` : `${data.stats.totalSessions} sessions done`)
+                  : (isEs ? 'Empieza hoy tu primera sesión' : 'Start your first session today')
+              )}
+            </p>
+          </div>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22, flexShrink: 0,
+          }}>+</div>
+        </Link>
+
+        {/* KPI strip — 4 stats en fila horizontal compacta */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
           {kpis.map((k, i) => (
             <div key={i} className={'fade-in s' + i} style={{
-              background: k.accent ? 'linear-gradient(135deg,rgba(200,255,0,0.1) 0%,rgba(200,255,0,0.04) 100%)' : CARD,
+              background: k.accent ? 'linear-gradient(135deg,rgba(200,255,0,0.10),rgba(200,255,0,0.03))' : CARD,
               border: '1px solid ' + (k.accent ? 'rgba(200,255,0,0.2)' : BORDER),
-              borderRadius: 18, padding: '18px 16px'
+              borderRadius: 14, padding: '12px 10px', textAlign: 'center',
             }}>
-              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T3, marginBottom: 10 }}>{k.label}</p>
-              {loading ? <Skel h={36} /> : (
-                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 34, fontWeight: 700, lineHeight: 1, color: k.accent ? ACC : T1 }}>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 8, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: T3, marginBottom: 6 }}>{k.label}</p>
+              {loading ? <Skel h={24} /> : (
+                <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 22, fontWeight: 700, lineHeight: 1, color: k.accent ? ACC : T1 }}>
                   {k.value === null ? '—' : k.value}
-                  {k.unit && k.value !== null && <span style={{ fontSize: 16, color: T2, marginLeft: 4 }}>{k.unit}</span>}
+                  {k.unit && k.value !== null && <span style={{ fontSize: 11, color: T2, marginLeft: 2 }}>{k.unit}</span>}
                 </p>
               )}
-              {k.sub && <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, color: T3, marginTop: 4 }}>{k.sub}</p>}
             </div>
           ))}
         </div>
-
-        {/* CTA Entrenar — inspirado en Strong App: compacto y claro */}
-        <Link href={'/' + locale + '/session/new'} className="fade-in s2" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          background: ACC,
-          color: BG, borderRadius: 14, padding: '15px 20px',
-          fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 800,
-          letterSpacing: '0.02em'
-        }}>
-          <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
-          {isEs ? 'Entrenar ahora' : 'Train now'}
-        </Link>
 
         {/* CSS VolumeBarChart — datos reales desde /api/volume/weekly */}
         {!loading && volumeWeeks.length > 0 && (

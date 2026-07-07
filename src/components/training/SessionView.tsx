@@ -220,4 +220,187 @@ export function SessionView({ athleteId, initialTemplate, availableTemplates }: 
                 >
                   <div>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: 'Syne,sans-serif' }}>{tmpl.name}</p>
-                 
+                    <p style={{ margin: '2px 0 0', fontSize: 11, color: '#666', fontFamily: 'DM Mono,monospace' }}>
+                      {tmpl.training_days_per_week} {locale === 'es' ? 'días/semana' : 'days/week'}
+                    </p>
+                  </div>
+                  {selectedTemplateId === tmpl.id && (
+                    <span style={{ fontSize: 18, color: ACC }}>✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {availableTemplates.length === 0 && (
+          <div style={{ padding: 16, background: CARD, border: `1px solid ${BDR}`, borderRadius: 12, marginBottom: 20, fontSize: 13, color: '#666', fontFamily: 'DM Mono,monospace' }}>
+            {t(locale, 'noTemplates')}{' '}
+            <a href={`/${locale}/training/templates`} style={{ color: ACC }}>{t(locale, 'createFirst')}</a>
+          </div>
+        )}
+
+        {/* Day selector — only shown when a template with days is selected */}
+        {selectedTemplate && templateDays.length > 1 && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, color: '#555', fontFamily: 'DM Mono,monospace', textTransform: 'uppercase', letterSpacing: '.1em' }}>
+              {t(locale, 'selectDay')}
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {templateDays.map(d => (
+                <button
+                  key={d.day_number}
+                  onClick={() => setSelectedDay(d.day_number)}
+                  style={{
+                    padding: '8px 14px', borderRadius: 10, border: `1px solid ${selectedDay === d.day_number ? ACC : BDR}`,
+                    background: selectedDay === d.day_number ? `${ACC}18` : CARD,
+                    color: selectedDay === d.day_number ? ACC : '#888',
+                    fontSize: 12, fontFamily: 'DM Mono,monospace', cursor: 'pointer', fontWeight: selectedDay === d.day_number ? 700 : 400
+                  }}
+                >
+                  {d.day_label || `${t(locale, 'dayLabel')} ${d.day_number}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Exercise preview for selected day */}
+        {dayExercises.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11, color: '#555', fontFamily: 'DM Mono,monospace', textTransform: 'uppercase', letterSpacing: '.1em' }}>
+              {t(locale, 'preview')} · {dayExercises.length} {t(locale, 'exercises')}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {dayExercises.map((te, i) => (
+                <div key={te.id} style={{ padding: '10px 14px', background: CARD, border: `1px solid ${BDR}`, borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: '#444', fontFamily: 'DM Mono,monospace', minWidth: 20 }}>{i + 1}</span>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#ddd', fontFamily: 'Syne,sans-serif' }}>
+                        {te.exercise?.name ?? '—'}
+                      </p>
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: '#555', fontFamily: 'DM Mono,monospace' }}>
+                        {te.exercise?.muscle_group_primary}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ margin: 0, fontSize: 12, color: ACC, fontFamily: 'DM Mono,monospace', fontWeight: 700 }}>
+                      {te.sets_target ?? 3}×{te.rep_range_min ?? '?'}-{te.rep_range_max ?? '?'}
+                    </p>
+                    {te.rir_target != null && (
+                      <p style={{ margin: '2px 0 0', fontSize: 10, color: '#555', fontFamily: 'DM Mono,monospace' }}>
+                        RIR {te.rir_target}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Start button */}
+        <button
+          onClick={handleStart}
+          disabled={starting}
+          style={{
+            width: '100%', padding: '18px', borderRadius: 16, border: 'none',
+            background: starting ? '#444' : `linear-gradient(135deg,${ACC} 0%,#88DD00 100%)`,
+            color: '#0A0A0F', fontSize: 16, fontWeight: 800, cursor: starting ? 'not-allowed' : 'pointer',
+            fontFamily: 'Syne,sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+          }}
+        >
+          {starting ? t(locale, 'starting') : `▶ ${t(locale, 'start')}`}
+        </button>
+      </div>
+    )
+  }
+
+  // ─── ACTIVE SESSION ───────────────────────────────────────────────
+  const currentEx = exercises[currentExerciseIndex]
+  const totalExercises = exercises.length
+  const completedExercises = exercises.filter(ex => ex.sets.length >= DEFAULT_SETS_TARGET).length
+
+  if (completedExercises === totalExercises && totalExercises > 0) {
+    return (
+      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 24, background: '#0A0A0F' }}>
+        <div style={{ fontSize: 64 }}>🏆</div>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: '#fff', fontFamily: 'Syne,sans-serif' }}>
+            {t(locale, 'complete')}
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: '#666', fontFamily: 'DM Mono,monospace' }}>
+            {t(locale, 'duration')} {formatTime(elapsed)}
+          </p>
+        </div>
+        <button
+          onClick={handleEnd}
+          style={{ width: '100%', maxWidth: 360, padding: 18, borderRadius: 16, border: 'none', background: 'linear-gradient(135deg,#C8FF00 0%,#88DD00 100%)', color: '#0A0A0F', fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'Syne,sans-serif' }}
+        >
+          {t(locale, 'save')}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#0A0A0F' }}>
+      {/* Sticky header */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '12px 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ margin: 0, fontSize: 12, color: '#666', fontFamily: 'DM Mono,monospace' }}>⏱ {formatTime(elapsed)}</p>
+          <div style={{ fontSize: 12, color: '#666', fontFamily: 'DM Mono,monospace' }}>
+            {completedExercises}/{totalExercises} {t(locale, 'exercises')}
+          </div>
+        </div>
+        <div style={{ marginTop: 8, height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ height: '100%', background: '#C8FF00', borderRadius: 2, transition: 'width 0.3s', width: `${totalExercises > 0 ? (completedExercises / totalExercises) * 100 : 0}%` }} />
+        </div>
+      </div>
+
+      {/* Set logger */}
+      <div style={{ flex: 1, padding: 16 }}>
+        {currentEx && (
+          <SetLogger
+            key={`${currentEx.exercise_id}-${currentEx.sets.length + 1}`}
+            exerciseId={currentEx.exercise_id}
+            exerciseName={currentEx.name}
+            setNumber={currentEx.sets.length + 1}
+            previousWeight={currentEx.sets[currentEx.sets.length - 1]?.weight_kg ?? undefined}
+            previousReps={currentEx.sets[currentEx.sets.length - 1]?.reps_completed ?? undefined}
+            onSetLogged={async (data) => {
+              addSet(currentExerciseIndex, {
+                set_number: data.setNumber,
+                set_type: data.isWarmup ? 'warmup' : 'working',
+                weight_kg: data.weightKg,
+                reps_completed: data.reps,
+                rir_actual: data.rir ?? null,
+                rpe_actual: null,
+                notes: null,
+              })
+              if (currentEx.sets.length + 1 >= DEFAULT_SETS_TARGET) {
+                setCurrentExerciseIndex(Math.min(currentExerciseIndex + 1, totalExercises - 1))
+              }
+            }}
+            onSkip={currentExerciseIndex < totalExercises - 1
+              ? () => setCurrentExerciseIndex(currentExerciseIndex + 1)
+              : undefined}
+          />
+        )}
+      </div>
+
+      {currentExerciseIndex < totalExercises - 1 && (
+        <div style={{ padding: '0 16px 96px' }}>
+          <button
+            onClick={() => setCurrentExerciseIndex(currentExerciseIndex + 1)}
+            style={{ width: '100%', fontSize: 12, color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'DM Mono,monospace' }}
+          >
+            Saltar ejercicio →
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}

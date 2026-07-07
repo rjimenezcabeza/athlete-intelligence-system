@@ -6,6 +6,7 @@ const TABS_ES = [
   { key: 'perfil',    label: 'Perfil',    suffix: '' },
   { key: 'metricas',  label: 'Métricas',  suffix: '/metrics' },
   { key: 'nutricion', label: 'Nutrición', suffix: '/nutrition' },
+  { key: 'metas',     label: '🎯 Metas',  suffix: '/goals' },
   { key: 'tecnica',   label: 'Técnica',   suffix: '/tecnica' },
   { key: 'historial', label: 'Historial', suffix: '/historial' },
 ]
@@ -13,6 +14,7 @@ const TABS_EN = [
   { key: 'profile',    label: 'Profile',    suffix: '' },
   { key: 'metrics',    label: 'Metrics',    suffix: '/metrics' },
   { key: 'nutrition',  label: 'Nutrition',  suffix: '/nutrition' },
+  { key: 'goals',      label: '🎯 Goals',   suffix: '/goals' },
   { key: 'technique',  label: 'Technique',  suffix: '/tecnica' },
   { key: 'history',    label: 'History',    suffix: '/historial' },
 ]
@@ -26,6 +28,7 @@ export function AthleteTabBar({ locale }: { locale: string }) {
   const activeKey = (() => {
     if (pathname.includes('/metrics'))   return isEs ? 'metricas'  : 'metrics'
     if (pathname.includes('/nutrition')) return isEs ? 'nutricion' : 'nutrition'
+    if (pathname.includes('/goals'))     return isEs ? 'metas'     : 'goals'
     if (pathname.includes('/tecnica'))   return isEs ? 'tecnica'   : 'technique'
     if (pathname.includes('/historial')) return isEs ? 'historial' : 'history'
     return isEs ? 'perfil' : 'profile'

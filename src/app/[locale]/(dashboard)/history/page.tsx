@@ -135,11 +135,22 @@ export default function HistoryPage() {
       `}</style>
 
       {/* HEADER */}
-      <div style={{ padding: '40px 20px 16px', ...animStyle(0) }}>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 30, fontWeight: 700, color: T1, letterSpacing: '-0.02em', marginBottom: 4 }}>
-          {isEs ? 'Historial' : 'History'}
-        </h1>
-        <p style={{ fontSize: 13, color: T2 }}>
+      <div style={{ padding: '40px 20px 12px', ...animStyle(0) }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+          <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 30, fontWeight: 700, color: T1, letterSpacing: '-0.02em', margin: 0 }}>
+            {isEs ? 'Historial' : 'History'}
+          </h1>
+          <Link href={`/${locale}/import`} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px', background: 'rgba(200,255,0,0.08)',
+            border: '1px solid rgba(200,255,0,0.2)', borderRadius: 10,
+            color: ACC, fontSize: 12, fontWeight: 700, fontFamily: 'Syne, sans-serif',
+            textDecoration: 'none', flexShrink: 0,
+          }}>
+            📎 {isEs ? 'Importar' : 'Import'}
+          </Link>
+        </div>
+        <p style={{ fontSize: 13, color: T2, margin: 0 }}>
           {loading ? '...' : sessions.length + ' ' + (isEs ? 'sesiones en total' : 'total sessions')}
         </p>
       </div>

@@ -512,4 +512,12 @@ export function SmartImporter({ locale = 'es', onComplete, onClose }: Props) {
                 {isEs ? 'Reintentar' : 'Retry'}
               </button>
             ) : null}
-            <button
+            <button onClick={reset} style={{ padding: '10px 20px', background: '#C8FF00', border: 'none', borderRadius: '10px', color: '#0A0A0F', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}>
+              {isEs ? 'Subir de nuevo' : 'Upload again'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
