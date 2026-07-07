@@ -1,0 +1,54 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@custom-variant dark (&:is(.dark *));
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+:root {
+  --background: #0A0A0F;
+  --foreground: #F0F0F5;
+  /* AIS theme tokens — overridden per-palette via layout inline style */
+  --accent-color: #C8FF00;
+  --accent-bg: rgba(200,255,0,0.07);
+  --accent-border: rgba(200,255,0,0.19);
+  --bg-primary: #0A0A0F;
+  --card-bg: rgba(255,255,255,0.03);
+  --card-border: rgba(255,255,255,0.07);
+  --text-primary: #dddddd;
+  --text-secondary: #888888;
+  --text-tertiary: #444444;
+}
+::-webkit-scrollbar-thumb{background:var(--accent-color,#C8FF00)!important;opacity:0.25}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{background:#0A0A0F;-webkit-font-smoothing:antialiased}
+body{background:#0A0A0F!important;color:#F0F0F5!important;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
+a{text-decoration:none;color:inherit}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type="number"]{-moz-appearance:textfield}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:rgba(200,255,0,0.25);border-radius:2px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes pulseAcc{0%,100%{box-shadow:0 0 0 0 rgba(200,255,0,0.4),0 0 24px rgba(200,255,0,0.2)}50%{box-shadow:0 0 0 8px rgba(200,255,0,0),0 0 32px rgba(200,255,0,0.35)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.fade-in{animation:fadeIn 0.35s ease-out both}
+.slide-up{animation:slideUp 0.4s cubic-bezier(0.32,0.72,0,1) both}
+.pulse-acc{animation:pulseAcc 2.5s ease-in-out infinite}
+.spin{animation:spin 0.8s linear infinite}
+.s1{animation-delay:60ms}.s2{animation-delay:120ms}.s3{animation-delay:180ms}.s4{animation-delay:240ms}
+.skeleton{background:linear-gradient(90deg,#16161f 25%,#1e1e2e 50%,#16161f 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:10px}
+/* ── App utility classes ── */
+.page{min-height:100vh;background:#0A0A0F;color:#F0F0F5}
+.ais-card{background:#111118;border:1px solid rgba(255,255,255,0.06);border-radius:18px}
+.card{background:#111118;border:1px solid rgba(255,255,255,0.06);border-radius:18px}
+.stat-label{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#44445a}
+.label{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#44445a}
+.input{width:100%;background:#0d0d14;border:1.5px solid rgba(255,255,255,0.08);border-radius:14px;color:#F0F0F5;font-family:'Inter',sans-serif;font-size:15px;padding:14px 16px;outline:none;transition:border-color 0.2s;box-sizing:border-box}
+.input:focus{border-color:rgba(200,255,0,0.5)}
+.btn-primary{display:block;width:100%;background:linear-gradient(135deg,#C8FF00,#88DD00);color:#0A0A0F;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;font-family:'Syne',sans-serif;letter-spacing:0.04em;cursor:pointer;box-shadow:0 4px 20px rgba(200,255,0,0.3);text-align:center}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.btn-danger{width:100%;background:rgba(255,107,107,0.08);color:#FF6B6B;border:1px solid rgba(255,107,107,0.2);border-radius:14px;padding:14px;font-size:14px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer}
+.badge-pro{display:inline-flex;align-items:center;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:0.08em;font-family:'Syne',sans-serif;background:rgba(200,255,0,0.15);color:#C8FF00;border:1px solid rgba(200,255,0,0.3)}

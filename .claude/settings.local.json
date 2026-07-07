@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_XLSX_STATIC.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_BOM.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_BOM_V2.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_DOWNLOAD.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_EXCEL_AS_IMAGE.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_FINAL.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_IMPORT_V2.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_JSON_PARSE.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_IMPORT_COMPLETO.js\" 2>&1node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_IMPORT_COMPLETO.js\")",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_PROCESS_DEBUG.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_IMPORTADOR_FINAL.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_PAYLOAD.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_FIX_UPLOAD_DIRECTO.js\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\ricar\\\\OneDrive\\\\Escritorio\\\\AIS_REDISENO_DIRECTO.js\" 2>&1)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(git revert *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit -m ' *.)",
+      "PowerShell(cd \"C:\\\\Users\\\\ricar\\\\Dev\\\\athlete-intelligence-system\"; git add src/app/api/exercises/[id]/last-performance/route.ts src/app/api/volume/weekly/route.ts src/app/api/progression/calculate/route.ts src/app/api/progression/session-summary/route.ts src/hooks/useLastPerformance.ts src/components/workout/LastPerformanceBadge.tsx src/components/dashboard/MuscleVolumeChart.tsx src/components/session/ActiveSession.tsx src/app/[locale]/\\(dashboard\\)/dashboard/page.tsx src/i18n/messages/es.json src/i18n/messages/en.json src/i18n/messages/fr.json src/i18n/messages/de.json src/i18n/messages/it.json src/i18n/messages/nl.json; git status)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); keys=list\\(d.keys\\(\\)\\); print\\('TOP KEYS:', keys\\); prog=d.get\\('progression',{}\\); print\\('PROGRESSION KEYS:', list\\(prog.keys\\(\\)\\)\\)\")",
+      "Bash(python3 *)",
+      "PowerShell(npm run *)",
+      "Bash(node fix-coach-i18n.js)",
+      "Bash(npm run *)",
+      "Bash(npx vercel *)",
+      "Bash(git commit *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"const wp = require\\('web-push'\\); const k = wp.generateVAPIDKeys\\(\\); console.log\\('PUBLIC:', k.publicKey\\); console.log\\('PRIVATE:', k.privateKey\\);\")",
+      "Bash(node -e ' *)",
+      "PowerShell(ls \"C:\\\\Users\\\\ricar\\\\Dev\\\\athlete-intelligence-system\\\\src\\\\app\\\\[locale]\" | Select-Object -First 20 | ForEach-Object { $_.Name })"
+    ]
+  }
+}
